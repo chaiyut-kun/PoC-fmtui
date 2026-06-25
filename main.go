@@ -14,9 +14,10 @@ const baseDir = "./files"
 
 func main() {
 	program := tea.NewProgram(InitialModel())
-
-	if _, err := program.Run(); err != nil {
-		err = fmt.Errorf("Sorry Amanai something is wrong %v", err.Error())
+	m, err := program.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+	_ = m
 }

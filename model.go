@@ -19,12 +19,13 @@ type model struct {
 func InitialModel() model {
 
 	// read and list file from [./files]
-	entries, err := os.ReadDir(baseDir)
+	currentDir, _ := os.Getwd()
+	entries, err := os.ReadDir(currentDir)
 	if err != nil {
 
 		return model{
 			filesPath:  []string{},
-			currentDir: baseDir,
+			currentDir: currentDir,
 			selected:   make(map[int]struct{}),
 		}
 	}
@@ -36,7 +37,7 @@ func InitialModel() model {
 
 	return model{
 		filesPath:  files,
-		currentDir: baseDir,
+		currentDir: currentDir,
 		selected:   make(map[int]struct{}),
 	}
 
@@ -51,6 +52,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
+			_ = clearTempDirFile()
+			return m, tea.Quit
+		case "d", "D":
+			_ = writeTempDirFile(m.currentDir)
 			return m, tea.Quit
 		case "up", "k":
 			if m.cursor > 0 {
@@ -80,7 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// copy file path
 		case "c", "C":
-			absPath := findAbsPath(baseDir, m.filesPath[m.cursor])
+			absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
 			// copy to clipboard
 			if err := copyToClipboard(absPath); err != nil {
 				fmt.Println(err.Error())
@@ -99,14 +104,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fmt.Println(err.Error())
 			}
 
-			m.currentDir = nextDir
-			m.filesPath = m.filesPath[:0]
-			for _, entry := range entries {
-				m.filesPath = append(m.filesPath, entry.Name())
-			}
-
-			m.cursor = 0
-			m.selected = make(map[int]struct{})
+			m.reLoadDir(nextDir, entries)
 
 		case "left", "h", "H":
 
@@ -117,14 +115,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			m.currentDir = parent
-			m.filesPath = m.filesPath[:0]
-			for _, entry := range entries {
-				m.filesPath = append(m.filesPath, entry.Name())
-			}
-
-			m.cursor = 0
-			m.selected = make(map[int]struct{})
+			m.reLoadDir(parent, entries)
 		}
 	}
 
@@ -147,7 +138,7 @@ func (m model) View() tea.View {
 
 		renderedText += fmt.Sprintf("%s %s\n", cursor, list)
 	}
-	renderedText += "\nPress 'q' to quit.\n"
+	renderedText += "\nPress 'q' to quit.	| Press 'd' to quit with cd to selected directory.\n"
 
 	return tea.NewView(renderedText)
 }

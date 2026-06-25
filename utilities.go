@@ -7,6 +7,7 @@ import (
 	"github.com/atotto/clipboard"
 )
 
+const tempDirFile = "/tmp/fmtui-dir"
 // copy to clipboard
 func copyToClipboard(text string) error {
 	return clipboard.WriteAll(text)
@@ -33,4 +34,24 @@ func isDir(dir, name string) bool {
 		return false
 	}
 	return info.IsDir()
+}
+
+func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
+	m.currentDir = changeDir
+	m.filesPath = m.filesPath[:0]
+	for _, entry := range entries {
+		m.filesPath = append(m.filesPath, entry.Name())
+	}
+
+	m.cursor = 0
+	m.selected = make(map[int]struct{})
+}
+
+
+func writeTempDirFile(dir string) error {
+	return os.WriteFile(tempDirFile, []byte(dir), 0644)
+}
+
+func clearTempDirFile() error {
+	return os.Remove(tempDirFile)
 }
