@@ -3,17 +3,34 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type model struct {
-	filesPath  []string
-	cursor     int
-	currentDir string
-	selected   map[int]struct{}
+	filesPath           []string
+	cursor              int
+	currentDir          string
+	selected            map[int]struct{}
+	showHidden          bool
+	err                 error
+	scrollOffset        int
+	terminalHeight      int
+	terminalWidth       int
+	inputMode           bool
+	inputText           string
+	isCreatingDir       bool
+	copyMenuOpen        bool
+	activePane          int // 0 = Left (FM), 1 = Right (Preview)
+	previewScrollOffset int // vertical scroll offset for preview
+}
+
+type editorFinishedMsg struct {
+	err error
 }
 
 func InitialModel() model {
@@ -47,9 +64,139 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
+func (m *model) adjustScroll() {
+	if len(m.filesPath) == 0 {
+		m.scrollOffset = 0
+		return
+	}
+
+	// overhead is 5: borders (2 lines) + footer (2 lines) + optional error (1 line)
+	overhead := 5
+	maxVisible := m.terminalHeight - overhead
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+
+	if m.cursor < m.scrollOffset {
+		m.scrollOffset = m.cursor
+	}
+
+	if m.cursor >= m.scrollOffset+maxVisible {
+		m.scrollOffset = m.cursor - maxVisible + 1
+	}
+
+	if m.scrollOffset > len(m.filesPath)-maxVisible {
+		m.scrollOffset = len(m.filesPath) - maxVisible
+	}
+	if m.scrollOffset < 0 {
+		m.scrollOffset = 0
+	}
+}
+
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case editorFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.reloadCurrentDir()
+		}
+		return m, nil
+
+	case tea.WindowSizeMsg:
+		m.terminalHeight = msg.Height
+		m.terminalWidth = msg.Width
+		m.adjustScroll()
+		return m, nil
+
 	case tea.KeyPressMsg:
+		if m.copyMenuOpen {
+			switch msg.String() {
+			case "p", "P":
+				m.copyMenuOpen = false
+				if len(m.filesPath) > 0 {
+					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+					if err := copyToClipboard(absPath); err != nil {
+						m.err = err
+					}
+				}
+			case "n", "N":
+				m.copyMenuOpen = false
+				if len(m.filesPath) > 0 {
+					name := m.filesPath[m.cursor]
+					if !isDir(m.currentDir, name) {
+						name = strings.TrimSuffix(name, filepath.Ext(name))
+					}
+					if err := copyToClipboard(name); err != nil {
+						m.err = err
+					}
+				}
+			case "e", "E":
+				m.copyMenuOpen = false
+				if len(m.filesPath) > 0 {
+					name := m.filesPath[m.cursor]
+					if err := copyToClipboard(name); err != nil {
+						m.err = err
+					}
+				}
+			default:
+				// Any other key closes the menu (including esc)
+				m.copyMenuOpen = false
+			}
+			return m, nil
+		}
+
+		if m.inputMode {
+			switch msg.String() {
+			case "enter":
+				m.inputMode = false
+				if m.inputText == "" {
+					break
+				}
+				filePath := filepath.Join(m.currentDir, m.inputText)
+
+				if m.isCreatingDir {
+					err := os.Mkdir(filePath, 0755)
+					if err != nil {
+						m.err = err
+						break
+					}
+				} else {
+					file, err := os.Create(filePath)
+					if err != nil {
+						m.err = err
+						break
+					}
+					file.Close()
+				}
+
+				entries, err := os.ReadDir(m.currentDir)
+				if err != nil {
+					m.err = err
+					break
+				}
+				m.reLoadDir(m.currentDir, entries)
+				m.adjustScroll()
+			case "esc":
+				m.inputMode = false
+				m.inputText = ""
+			case "backspace":
+				if len(m.inputText) > 0 {
+					m.inputText = m.inputText[:len(m.inputText)-1]
+				}
+			default:
+				runes := []rune(msg.String())
+				if len(runes) == 1 {
+					m.inputText += string(runes)
+				}
+			}
+			return m, nil
+		}
+
 		switch msg.String() {
 		case "ctrl+c", "q":
 			_ = clearTempDirFile()
@@ -57,17 +204,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "d", "D":
 			_ = writeTempDirFile(m.currentDir)
 			return m, tea.Quit
-		case "up", "k":
-			if m.cursor > 0 {
-				m.cursor--
+		case "[", "]":
+			if m.activePane == 0 {
+				m.activePane = 1
 			} else {
-				m.cursor = len(m.filesPath) - 1
+				m.activePane = 0
+			}
+
+		case "up", "k":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			if m.activePane == 0 {
+				m.previewScrollOffset = 0
+				if m.cursor > 0 {
+					m.cursor--
+				} else {
+					m.cursor = len(m.filesPath) - 1
+				}
+				m.adjustScroll()
+			} else {
+				if m.previewScrollOffset > 0 {
+					m.previewScrollOffset--
+				}
 			}
 		case "down", "j":
-			if m.cursor < len(m.filesPath)-1 {
-				m.cursor++
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			if m.activePane == 0 {
+				m.previewScrollOffset = 0
+				if m.cursor < len(m.filesPath)-1 {
+					m.cursor++
+				} else {
+					m.cursor = 0
+				}
+				m.adjustScroll()
 			} else {
-				m.cursor = 0
+				m.previewScrollOffset++
 			}
 
 		case "enter", "space":
@@ -91,6 +267,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				fmt.Println(err.Error())
 			}
 
+		// copy menu
+		case "y", "Y":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			m.copyMenuOpen = true
+
+		// open editor
+		case "o", "O":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			name := m.filesPath[m.cursor]
+			if isDir(m.currentDir, name) {
+				break
+			}
+
+			editor := os.Getenv("EDITOR")
+			if editor == "" {
+				editor = "vi"
+			}
+
+			filePath := findAbsPath(m.currentDir, name)
+			c := exec.Command(editor, filePath)
+			return m, tea.ExecProcess(c, func(err error) tea.Msg {
+				return editorFinishedMsg{err: err}
+			})
+
 		case "right", "l", "L":
 			if !isDir(m.currentDir, m.filesPath[m.cursor]) {
 				return m, nil
@@ -107,15 +313,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.reLoadDir(nextDir, entries)
 
 		case "left", "h", "H":
-
+			m.err = nil
 			parent := filepath.Dir(m.currentDir)
 			entries, err := os.ReadDir(parent)
 			if err != nil {
-				fmt.Println(err.Error())
-				return m, nil
+				m.err = err
+				break
 			}
 
 			m.reLoadDir(parent, entries)
+			m.adjustScroll()
+
+		case ".":
+			m.showHidden = !m.showHidden
+			m.reloadCurrentDir()
+			m.adjustScroll()
 		}
 	}
 
@@ -125,7 +337,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m model) View() tea.View {
 	renderedText := ""
 
-	for i, list := range m.filesPath {
+	overhead := 5
+	maxVisible := m.terminalHeight - overhead
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
 
 		cursor := " "
 		if m.cursor == i {
@@ -135,12 +351,168 @@ func (m model) View() tea.View {
 		if isDir(m.currentDir, list) {
 			list = fmt.Sprintf("%s%s%s", Blue, list, Reset)
 		}
-
-		renderedText += fmt.Sprintf("%s %s\n", cursor, list)
+		renderedText += fmt.Sprintf("\nCreate %s: %s█\n(Enter to confirm, Esc to cancel)\n", prompt, m.inputText)
+	} else {
+		if m.err != nil {
+			renderedText += fmt.Sprintf("\n%sError: %v%s\n", Red, m.err, Reset)
+		} else {
+			renderedText += "\n"
+		}
+		hiddenStatus := "OFF"
+		if m.showHidden {
+			hiddenStatus = "ON "
+		}
+		renderedText += fmt.Sprintf("Press 'q' to quit.\t| Press 'd' to cd.\t| '.' hidden:%s\n", hiddenStatus)
 	}
-	renderedText += "\nPress 'q' to quit.	| Press 'd' to quit with cd to selected directory.\n"
 
-	return tea.NewView(renderedText)
+	// Trim trailing newline so lipgloss box height is calculated precisely
+	renderedText = strings.TrimSuffix(renderedText, "\n")
+
+	width := m.terminalWidth
+	height := m.terminalHeight
+	if width < 20 {
+		width = 80
+	}
+	if height < 5 {
+		height = 20
+	}
+
+	leftWidth := width / 2
+	rightWidth := width - leftWidth
+
+	leftBorderColor := "#555555"
+	rightBorderColor := "#555555"
+	if m.activePane == 0 {
+		leftBorderColor = "#5555FF"
+	} else {
+		rightBorderColor = "#5555FF"
+	}
+
+	// 1. Create left box (File Explorer)
+	leftStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(leftBorderColor)).
+		Width(leftWidth - 2).
+		Height(height - 2)
+
+	leftBox := leftStyle.Render(renderedText)
+
+	// Overlay " FMTUI " on left border
+	leftLines := strings.Split(leftBox, "\n")
+	if len(leftLines) > 0 {
+		topLine := []rune(leftLines[0])
+		title := []rune(" FMTUI ")
+		startIdx := (len(topLine) - len(title)) / 2
+		if startIdx > 0 && startIdx+len(title) < len(topLine) {
+			copy(topLine[startIdx:], title)
+			leftLines[0] = string(topLine)
+		}
+		leftBox = strings.Join(leftLines, "\n")
+	}
+
+	// 2. Create right box (Previewer)
+	var rightText string
+	maxVisiblePreviewLines := height - 4
+	if maxVisiblePreviewLines < 1 {
+		maxVisiblePreviewLines = 1
+	}
+
+	if len(m.filesPath) > 0 {
+		selectedName := m.filesPath[m.cursor]
+		targetPath := findAbsPath(m.currentDir, selectedName)
+		previewLines := getPreviewLines(targetPath, isDir(m.currentDir, selectedName), m.showHidden)
+
+		// Clamp previewScrollOffset based on number of lines and visible height
+		maxScroll := len(previewLines) - maxVisiblePreviewLines
+		if maxScroll < 0 {
+			maxScroll = 0
+		}
+		if m.previewScrollOffset > maxScroll {
+			m.previewScrollOffset = maxScroll
+		}
+		if m.previewScrollOffset < 0 {
+			m.previewScrollOffset = 0
+		}
+
+		endLine := m.previewScrollOffset + maxVisiblePreviewLines
+		if endLine > len(previewLines) {
+			endLine = len(previewLines)
+		}
+
+		maxWidth := rightWidth - 2
+		if maxWidth < 1 {
+			maxWidth = 1
+		}
+		var truncatedLines []string
+		for _, line := range previewLines[m.previewScrollOffset:endLine] {
+			expanded := strings.ReplaceAll(line, "\t", "    ")
+			runes := []rune(expanded)
+			if len(runes) > maxWidth {
+				truncatedLines = append(truncatedLines, string(runes[:maxWidth]))
+			} else {
+				truncatedLines = append(truncatedLines, expanded)
+			}
+		}
+		rightText = strings.Join(truncatedLines, "\n")
+	}
+	rightText = strings.TrimSuffix(rightText, "\n")
+
+	rightStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(rightBorderColor)).
+		Width(rightWidth - 2).
+		Height(height - 2)
+
+	rightBox := rightStyle.Render(rightText)
+
+	// Overlay " Preview " on right border
+	rightLines := strings.Split(rightBox, "\n")
+	if len(rightLines) > 0 {
+		topLine := []rune(rightLines[0])
+		title := []rune(" Preview ")
+		startIdx := (len(topLine) - len(title)) / 2
+		if startIdx > 0 && startIdx+len(title) < len(topLine) {
+			copy(topLine[startIdx:], title)
+			rightLines[0] = string(topLine)
+		}
+		rightBox = strings.Join(rightLines, "\n")
+	}
+
+	// Join both boxes horizontally
+	content := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+
+	// Render copy menu if open
+	if m.copyMenuOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#55FF55")). // Green border
+			Padding(1, 2)
+
+		dialogContent := "    Copy Menu\n\n" +
+			"[p] Copy absolute path\n" +
+			"[n] Copy name only\n" +
+			"[e] Copy name with ext\n\n" +
+			"Press ESC to cancel"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
+	return tea.NewView(content)
 }
 
 func (m *model) AddTask(task string) error {
