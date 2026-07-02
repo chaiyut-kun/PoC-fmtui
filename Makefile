@@ -6,3 +6,5 @@ bd:
 
 dev:
 	@go run .
+agy:
+	@agy.sh
