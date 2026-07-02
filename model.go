@@ -27,6 +27,7 @@ type model struct {
 	copyMenuOpen        bool
 	activePane          int // 0 = Left (FM), 1 = Right (Preview)
 	previewScrollOffset int // vertical scroll offset for preview
+	quitting            bool
 }
 
 type editorFinishedMsg struct {
@@ -200,8 +201,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			_ = clearTempDirFile()
+			m.quitting = true
 			return m, tea.Quit
 		case "d", "D":
+			m.quitting = true
 			_ = writeTempDirFile(m.currentDir)
 			return m, tea.Quit
 		case "[", "]":
@@ -335,6 +338,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() tea.View {
+	if m.quitting {
+		return tea.NewView("")
+	}
+
 	renderedText := ""
 
 	overhead := 5
