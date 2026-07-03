@@ -493,6 +493,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = clearTempDirFile()
 			m.quitting = true
 			return m, tea.Quit
+		case "esc":
+			m.selected = make(map[int]struct{})
+			m.stagedPaths = nil
+			m.stagedOp = ""
+			m.statusMsg = "Cleared all selections"
+			m.err = nil
+
 		case "E", "e":
 			m.quitting = true
 			_ = writeTempDirFile(t.currentDir)
@@ -594,10 +601,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.selected[t.cursor] = struct{}{}
 			}
-			if t.cursor < len(t.filesPath)-1 {
-				t.cursor++
-				m.adjustScroll()
-			}
 
 		case "enter":
 			if len(t.filesPath) == 0 {
@@ -640,6 +643,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.inputText = ""
 			m.isCreatingDir = false
 			m.isRenaming = false
+
+		// Toggle Select All ('a' / 'A')
+		case "a", "A":
+			if len(t.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			if len(m.selected) == len(t.filesPath) {
+				m.selected = make(map[int]struct{})
+				m.statusMsg = "Deselected all item(s)"
+			} else {
+				m.selected = make(map[int]struct{})
+				for i := range t.filesPath {
+					m.selected[i] = struct{}{}
+				}
+				m.statusMsg = fmt.Sprintf("Selected all %d item(s)", len(t.filesPath))
+			}
 		case "g", "G":
 			if len(t.filesPath) == 0 {
 				break
@@ -1131,7 +1151,7 @@ func (m model) View() tea.View {
 	if m.showHidden {
 		hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'c' copy | 'm' move | 'v'/'p' paste | 'g' jump link | 'K' mklink | 'e' exit&cd | '.' hidden:%s | 'tab' pane | '`' help", hiddenStatus)
+	helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'a' all | 'c' copy | 'm' move | 'v'/'p' paste | 'g' jump link | 'K' mklink | 'e' exit&cd | '.' hidden:%s | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
@@ -1279,6 +1299,7 @@ func (m model) View() tea.View {
 			"  t / w              New tab / close tab\n\n" +
 			"File Actions:\n" +
 			"  f / m              Create file / directory\n" +
+			"  a                  Toggle select all / deselect all\n" +
 			"  K                  Create symlink for selected item\n" +
 			"  g                  Jump / follow symlink target\n" +
 			"  r                  Rename file or directory\n" +

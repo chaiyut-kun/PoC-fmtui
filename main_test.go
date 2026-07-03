@@ -555,8 +555,8 @@ func TestSelectionAndCopyMoveAction(t *testing.T) {
 	if _, ok := m.selected[0]; !ok {
 		t.Errorf("Expected item at index 0 to be selected")
 	}
-	if m.curTab().cursor != 1 {
-		t.Errorf("Expected cursor to advance to 1, got %d", m.curTab().cursor)
+	if m.curTab().cursor != 0 {
+		t.Errorf("Expected cursor to remain at 0, got %d", m.curTab().cursor)
 	}
 
 	// 2. Press "c" to stage selected items for copy
@@ -592,7 +592,10 @@ func TestMultiSelectDeleteAction(t *testing.T) {
 	// 1. Press space to select file1.txt
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "space"})
 	m = updatedModel.(model)
-	// 2. Press space to select file2.txt
+
+	// 2. Move cursor down and press space to select file2.txt
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
+	m = updatedModel.(model)
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "space"})
 	m = updatedModel.(model)
 
@@ -730,6 +733,52 @@ func TestCreateAndJumpSymlinkActions(t *testing.T) {
 	m = updatedModel.(model)
 	if m.curTab().currentDir != subDir {
 		t.Errorf("Expected currentDir to be %q after jump 'g', got %q", subDir, m.curTab().currentDir)
+	}
+}
+
+func TestClearAllSelections(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().filesPath = []string{"file1.txt", "file2.txt"}
+	m.curTab().cursor = 0
+
+	// Select file1.txt
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "space"})
+	m = updatedModel.(model)
+
+	if len(m.selected) != 1 {
+		t.Fatalf("Expected 1 selected item, got %d", len(m.selected))
+	}
+
+	// Press ESC in normal mode to clear all selections
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+
+	if len(m.selected) != 0 {
+		t.Errorf("Expected 0 selected items after ESC, got %d", len(m.selected))
+	}
+}
+
+func TestSelectAllToggleAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().filesPath = []string{"file1.txt", "file2.txt", "file3.txt"}
+	m.curTab().cursor = 0
+
+	// 1. Press "a" -> selects all 3 items
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "a"})
+	m = updatedModel.(model)
+	if len(m.selected) != 3 {
+		t.Fatalf("Expected 3 items selected after 'a', got %d", len(m.selected))
+	}
+
+	// 2. Press "a" again -> deselects all items
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "a"})
+	m = updatedModel.(model)
+	if len(m.selected) != 0 {
+		t.Errorf("Expected 0 items selected after second 'a', got %d", len(m.selected))
 	}
 }
 
