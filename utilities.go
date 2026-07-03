@@ -54,6 +54,54 @@ func copyToClipboard(text string) error {
 	return clipboard.WriteAll(text)
 }
 
+func generateDirectoryStructure(root string, showHidden bool) string {
+	var sb strings.Builder
+	rootDirName := filepath.Base(root)
+	if rootDirName == "" || rootDirName == "." || rootDirName == "/" {
+		rootDirName = root
+	}
+	sb.WriteString(rootDirName + "/\n")
+
+	var walk func(currentDir string, prefix string, depth int)
+	walk = func(currentDir string, prefix string, depth int) {
+		if depth > 5 {
+			return
+		}
+		entries, err := os.ReadDir(currentDir)
+		if err != nil {
+			return
+		}
+
+		var filtered []os.DirEntry
+		for _, e := range entries {
+			if !showHidden && strings.HasPrefix(e.Name(), ".") {
+				continue
+			}
+			filtered = append(filtered, e)
+		}
+
+		for i, e := range filtered {
+			isLast := i == len(filtered)-1
+			connector := "├── "
+			childPrefix := "│   "
+			if isLast {
+				connector = "└── "
+				childPrefix = "    "
+			}
+
+			if e.IsDir() {
+				sb.WriteString(prefix + connector + e.Name() + "/\n")
+				walk(filepath.Join(currentDir, e.Name()), prefix+childPrefix, depth+1)
+			} else {
+				sb.WriteString(prefix + connector + e.Name() + "\n")
+			}
+		}
+	}
+
+	walk(root, "", 1)
+	return sb.String()
+}
+
 func findAbsPath(dir string, fileName string) string {
 
 	dir, err := filepath.Abs(dir)

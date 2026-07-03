@@ -637,3 +637,29 @@ func TestSubshellAction(t *testing.T) {
 	}
 }
 
+func TestCopyDirStructureAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+
+	// 1. Press "y" to open Copy Menu
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "y"})
+	m = updatedModel.(model)
+	if !m.copyMenuOpen {
+		t.Errorf("Expected copyMenuOpen to be true after pressing 'y'")
+	}
+
+	// 2. Press "s" to copy directory structure tree
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "s"})
+	m = updatedModel.(model)
+	if m.copyMenuOpen {
+		t.Errorf("Expected copyMenuOpen to be false after pressing 's'")
+	}
+
+	// Test tree structure generation function directly
+	tree := generateDirectoryStructure(".", false)
+	if !strings.Contains(tree, "/") {
+		t.Errorf("Expected generated directory structure tree to contain '/', got: %q", tree)
+	}
+}
+

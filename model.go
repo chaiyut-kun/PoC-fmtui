@@ -248,6 +248,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.err = err
 					}
 				}
+			case "s", "S":
+				m.copyMenuOpen = false
+				treeStr := generateDirectoryStructure(t.currentDir, m.showHidden)
+				if err := copyToClipboard(treeStr); err != nil {
+					m.err = err
+				} else {
+					m.statusMsg = "Copied CWD directory structure to clipboard"
+				}
 			default:
 				// Any other key closes the menu (including esc)
 				m.copyMenuOpen = false
@@ -767,7 +775,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpMenuOpen = true
 
 		// Temporary switch to shell
-		case ":":
+		case ":", "!", "S":
 			shell := os.Getenv("SHELL")
 			if shell == "" {
 				if runtime.GOOS == "windows" {
@@ -1057,10 +1065,11 @@ func (m model) View() tea.View {
 			BorderForeground(lipgloss.Color("#55FF55")). // Green border
 			Padding(1, 2)
 
-		dialogContent := "    Copy Menu\n\n" +
+		dialogContent := "         Copy Menu\n\n" +
 			"[p] Copy absolute path\n" +
 			"[n] Copy name only\n" +
-			"[e] Copy name with ext\n\n" +
+			"[e] Copy name with ext\n" +
+			"[s] Copy dir structure (tree)\n\n" +
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
@@ -1190,7 +1199,7 @@ func (m model) View() tea.View {
 			"  f / g              Create file / directory\n" +
 			"  r                  Rename file or directory\n" +
 			"  d                  Delete menu (p: permanent, n: trash)\n" +
-			"  y                  Copy menu (p: path, n: name, e: ext)\n" +
+			"  y                  Copy menu (p: path, n: name, e: ext, s: tree)\n" +
 			"  p                  Permission menu (x: chmod +x/-x)\n" +
 			"  o                  Open menu [c: VSCode CWD, C: VSCode item, r: GUI, e: $EDITOR]\n" +
 			"  .                  Toggle hidden files\n\n" +
