@@ -61,7 +61,7 @@ func TestCopyToClipboard(t *testing.T) {
 
 func TestPaneSwitchingAndScrolling(t *testing.T) {
 	m := InitialModel()
-	m.filesPath = []string{"file1.txt", "file2.txt"}
+	m.tabs[m.activeTab].filesPath = []string{"file1.txt", "file2.txt"}
 	
 	// Default active pane should be 0 (Left Explorer)
 	if m.activePane != 0 {
@@ -84,30 +84,30 @@ func TestPaneSwitchingAndScrolling(t *testing.T) {
 
 	// In activePane 1, pressing down/j should increment previewScrollOffset
 	m.activePane = 1
-	m.previewScrollOffset = 0
+	m.curTab().previewScrollOffset = 0
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
 	m = updatedModel.(model)
-	if m.previewScrollOffset != 1 {
-		t.Errorf("Expected previewScrollOffset to be 1 after pressing 'j' in right pane, got %d", m.previewScrollOffset)
+	if m.curTab().previewScrollOffset != 1 {
+		t.Errorf("Expected previewScrollOffset to be 1 after pressing 'j' in right pane, got %d", m.curTab().previewScrollOffset)
 	}
 
 	// In activePane 0, pressing down/j should move file cursor instead of scrolling preview
 	m.activePane = 0
-	m.cursor = 0
-	m.previewScrollOffset = 5
+	m.curTab().cursor = 0
+	m.curTab().previewScrollOffset = 5
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
 	m = updatedModel.(model)
-	if m.cursor != 1 {
-		t.Errorf("Expected cursor to increment to 1, got %d", m.cursor)
+	if m.curTab().cursor != 1 {
+		t.Errorf("Expected cursor to increment to 1, got %d", m.curTab().cursor)
 	}
-	if m.previewScrollOffset != 0 {
-		t.Errorf("Expected previewScrollOffset to reset to 0 after moving cursor in left pane, got %d", m.previewScrollOffset)
+	if m.curTab().previewScrollOffset != 0 {
+		t.Errorf("Expected previewScrollOffset to reset to 0 after moving cursor in left pane, got %d", m.curTab().previewScrollOffset)
 	}
 }
 
 func TestPreviewLineTruncation(t *testing.T) {
 	m := InitialModel()
-	m.terminalWidth = 40
+	m.terminalWidth = 60
 	m.terminalHeight = 10
 	
 	tempFile, err := os.CreateTemp("", "test_preview_truncation_*.txt")
@@ -122,9 +122,9 @@ func TestPreviewLineTruncation(t *testing.T) {
 	}
 	tempFile.Close()
 	
-	m.filesPath = []string{filepath.Base(tempFile.Name())}
-	m.currentDir = filepath.Dir(tempFile.Name())
-	m.cursor = 0
+	m.curTab().filesPath = []string{filepath.Base(tempFile.Name())}
+	m.curTab().currentDir = filepath.Dir(tempFile.Name())
+	m.curTab().cursor = 0
 	
 	view := m.View()
 	viewStr := view.Content
@@ -152,9 +152,9 @@ func TestDeleteAction(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 80
 	m.terminalHeight = 24
-	m.currentDir = filepath.Dir(tempPath)
-	m.filesPath = []string{filepath.Base(tempPath)}
-	m.cursor = 0
+	m.curTab().currentDir = filepath.Dir(tempPath)
+	m.curTab().filesPath = []string{filepath.Base(tempPath)}
+	m.curTab().cursor = 0
 
 	// 1. Pressing "d" opens delete menu
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "d"})
@@ -192,9 +192,9 @@ func TestRenameAction(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 80
 	m.terminalHeight = 24
-	m.currentDir = tempDir
-	m.filesPath = []string{"old_name.txt"}
-	m.cursor = 0
+	m.curTab().currentDir = tempDir
+	m.curTab().filesPath = []string{"old_name.txt"}
+	m.curTab().cursor = 0
 
 	// Press "r" to trigger rename
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "r"})
@@ -226,9 +226,9 @@ func TestUndoRedo(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 80
 	m.terminalHeight = 24
-	m.currentDir = tempDir
-	m.filesPath = []string{}
-	m.cursor = 0
+	m.curTab().currentDir = tempDir
+	m.curTab().filesPath = []string{}
+	m.curTab().cursor = 0
 
 	// 1. Create file "created_file.txt"
 	m.inputMode = true
@@ -267,9 +267,9 @@ func TestNormalDeleteAndUndo(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 80
 	m.terminalHeight = 24
-	m.currentDir = filepath.Dir(tempPath)
-	m.filesPath = []string{filepath.Base(tempPath)}
-	m.cursor = 0
+	m.curTab().currentDir = filepath.Dir(tempPath)
+	m.curTab().filesPath = []string{filepath.Base(tempPath)}
+	m.curTab().cursor = 0
 
 	// 1. Press "d" to open delete menu
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "d"})
@@ -315,8 +315,8 @@ func TestShowCurrentPathInTopBorder(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 120
 	m.terminalHeight = 24
-	m.currentDir = tempDir
-	m.filesPath = []string{}
+	m.curTab().currentDir = tempDir
+	m.curTab().filesPath = []string{}
 
 	view := m.View()
 	if !strings.Contains(view.Content, tempDir) {
@@ -356,9 +356,9 @@ func TestChmodExecutableAction(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 80
 	m.terminalHeight = 24
-	m.currentDir = filepath.Dir(tempPath)
-	m.filesPath = []string{filepath.Base(tempPath)}
-	m.cursor = 0
+	m.curTab().currentDir = filepath.Dir(tempPath)
+	m.curTab().filesPath = []string{filepath.Base(tempPath)}
+	m.curTab().cursor = 0
 
 	// 1. Press "p" to open permission menu
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "p"})
@@ -429,26 +429,26 @@ func TestMouseScrollAction(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 100
 	m.terminalHeight = 30
-	m.filesPath = []string{"file1.txt", "file2.txt", "file3.txt"}
-	m.cursor = 0
+	m.tabs[m.activeTab].filesPath = []string{"file1.txt", "file2.txt", "file3.txt"}
+	m.tabs[m.activeTab].cursor = 0
 	m.activePane = 0
 
 	// 1. Mouse Wheel Down in Pane 0 -> cursor moves down to 1
 	updatedModel, _ := m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
 	m = updatedModel.(model)
-	if m.cursor != 1 {
-		t.Errorf("Expected cursor to be 1 after MouseWheelDown, got %d", m.cursor)
+	if m.curTab().cursor != 1 {
+		t.Errorf("Expected cursor to be 1 after MouseWheelDown, got %d", m.curTab().cursor)
 	}
 
 	// 2. Mouse Wheel Up in Pane 0 -> cursor moves up to 0
 	updatedModel, _ = m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelUp}))
 	m = updatedModel.(model)
-	if m.cursor != 0 {
-		t.Errorf("Expected cursor to be 0 after MouseWheelUp, got %d", m.cursor)
+	if m.curTab().cursor != 0 {
+		t.Errorf("Expected cursor to be 0 after MouseWheelUp, got %d", m.curTab().cursor)
 	}
 
-	// 3. Mouse Click on right half -> activePane switches to 1
-	updatedModel, _ = m.Update(tea.MouseClickMsg(tea.Mouse{Button: tea.MouseLeft, X: 60, Y: 10}))
+	// 3. Mouse Click on right pane -> activePane switches to 1
+	updatedModel, _ = m.Update(tea.MouseClickMsg(tea.Mouse{Button: tea.MouseLeft, X: 80, Y: 10}))
 	m = updatedModel.(model)
 	if m.activePane != 1 {
 		t.Errorf("Expected activePane to be 1 after clicking right pane, got %d", m.activePane)
@@ -457,8 +457,52 @@ func TestMouseScrollAction(t *testing.T) {
 	// 4. Mouse Wheel Down in Pane 1 -> previewScrollOffset increments to 1
 	updatedModel, _ = m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
 	m = updatedModel.(model)
-	if m.previewScrollOffset != 1 {
-		t.Errorf("Expected previewScrollOffset to be 1 after MouseWheelDown in Pane 1, got %d", m.previewScrollOffset)
+	if m.curTab().previewScrollOffset != 1 {
+		t.Errorf("Expected previewScrollOffset to be 1 after MouseWheelDown in Pane 1, got %d", m.curTab().previewScrollOffset)
+	}
+}
+
+func TestMultiTabsAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 120
+	m.terminalHeight = 30
+
+	if len(m.tabs) != 1 {
+		t.Fatalf("Expected 1 initial tab, got %d", len(m.tabs))
+	}
+
+	// 1. Press "t" to open new tab
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "t"})
+	m = updatedModel.(model)
+	if len(m.tabs) != 2 {
+		t.Fatalf("Expected 2 tabs after pressing 't', got %d", len(m.tabs))
+	}
+	if m.activeTab != 1 {
+		t.Errorf("Expected activeTab to be 1 (second tab), got %d", m.activeTab)
+	}
+
+	// 2. Press "tab" to switch to next tab (loops back to 0)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
+	m = updatedModel.(model)
+	if m.activeTab != 0 {
+		t.Errorf("Expected activeTab to be 0 after pressing 'tab', got %d", m.activeTab)
+	}
+
+	// 3. Press "shift+tab" to switch backward (goes back to 1)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "shift+tab"})
+	m = updatedModel.(model)
+	if m.activeTab != 1 {
+		t.Errorf("Expected activeTab to be 1 after pressing 'shift+tab', got %d", m.activeTab)
+	}
+
+	// 4. Press "w" to close tab 1
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "w"})
+	m = updatedModel.(model)
+	if len(m.tabs) != 1 {
+		t.Fatalf("Expected 1 tab after closing with 'w', got %d", len(m.tabs))
+	}
+	if m.activeTab != 0 {
+		t.Errorf("Expected activeTab to be 0 after tab close, got %d", m.activeTab)
 	}
 }
 

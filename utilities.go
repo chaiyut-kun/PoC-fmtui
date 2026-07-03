@@ -42,28 +42,30 @@ func isDir(dir, name string) bool {
 }
 
 func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
-	m.currentDir = changeDir
-	m.filesPath = m.filesPath[:0]
+	t := m.curTab()
+	t.currentDir = changeDir
+	t.filesPath = t.filesPath[:0]
 	for _, entry := range entries {
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
 		}
-		m.filesPath = append(m.filesPath, entry.Name())
+		t.filesPath = append(t.filesPath, entry.Name())
 	}
 
-	m.cursor = 0
-	m.scrollOffset = 0
-	m.previewScrollOffset = 0
+	t.cursor = 0
+	t.scrollOffset = 0
+	t.previewScrollOffset = 0
 	m.selected = make(map[int]struct{})
 }
 
 func (m *model) reloadCurrentDir() {
-	entries, err := os.ReadDir(m.currentDir)
+	t := m.curTab()
+	entries, err := os.ReadDir(t.currentDir)
 	if err != nil {
 		m.err = err
 		return
 	}
-	m.reLoadDir(m.currentDir, entries)
+	m.reLoadDir(t.currentDir, entries)
 }
 
 func writeTempDirFile(dir string) error {
@@ -80,7 +82,8 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 	var bgColor string
 	var icon string
 
-	if isDir(m.currentDir, list) {
+	t := m.curTab()
+	if isDir(t.currentDir, list) {
 
 		if list == ".git" {
 			icon = GitIcon

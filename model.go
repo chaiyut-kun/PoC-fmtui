@@ -31,14 +31,20 @@ type ActionRecord struct {
 	IsDir        bool
 }
 
-type model struct {
+type TabState struct {
+	currentDir          string
 	filesPath           []string
 	cursor              int
-	currentDir          string
+	scrollOffset        int
+	previewScrollOffset int
+}
+
+type model struct {
+	tabs                []TabState
+	activeTab           int
 	selected            map[int]struct{}
 	showHidden          bool
 	err                 error
-	scrollOffset        int
 	terminalHeight      int
 	terminalWidth       int
 	inputMode           bool
@@ -50,10 +56,23 @@ type model struct {
 	permissionMenuOpen  bool
 	helpMenuOpen        bool
 	activePane          int // 0 = Left (FM), 1 = Right (Preview)
-	previewScrollOffset int // vertical scroll offset for preview
 	quitting            bool
 	undoStack           []ActionRecord
 	redoStack           []ActionRecord
+}
+
+func (m *model) curTab() *TabState {
+	if len(m.tabs) == 0 {
+		dir, _ := os.Getwd()
+		m.tabs = []TabState{{currentDir: dir}}
+	}
+	if m.activeTab < 0 {
+		m.activeTab = 0
+	}
+	if m.activeTab >= len(m.tabs) {
+		m.activeTab = len(m.tabs) - 1
+	}
+	return &m.tabs[m.activeTab]
 }
 
 type editorFinishedMsg struct {
@@ -61,33 +80,28 @@ type editorFinishedMsg struct {
 }
 
 func InitialModel() model {
-
-	// read and list file from [./files]
 	currentDir, _ := os.Getwd()
 	entries, err := os.ReadDir(currentDir)
-	if err != nil {
-
-		return model{
-			filesPath:  []string{},
-			currentDir: currentDir,
-			selected:   make(map[int]struct{}),
+	files := []string{}
+	if err == nil {
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			files = append(files, entry.Name())
 		}
 	}
 
-	files := []string{}
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		files = append(files, entry.Name())
+	initialTab := TabState{
+		currentDir: currentDir,
+		filesPath:  files,
 	}
 
 	return model{
-		filesPath:  files,
-		currentDir: currentDir,
-		selected:   make(map[int]struct{}),
+		tabs:      []TabState{initialTab},
+		activeTab: 0,
+		selected:  make(map[int]struct{}),
 	}
-
 }
 
 func (m model) Init() tea.Cmd {
@@ -95,8 +109,9 @@ func (m model) Init() tea.Cmd {
 }
 
 func (m *model) adjustScroll() {
-	if len(m.filesPath) == 0 {
-		m.scrollOffset = 0
+	t := m.curTab()
+	if len(t.filesPath) == 0 {
+		t.scrollOffset = 0
 		return
 	}
 
@@ -109,23 +124,23 @@ func (m *model) adjustScroll() {
 		maxVisible = 1
 	}
 
-	if m.scrollOffset < 0 {
-		m.scrollOffset = 0
+	if t.scrollOffset < 0 {
+		t.scrollOffset = 0
 	}
 
-	if m.cursor < m.scrollOffset {
-		m.scrollOffset = m.cursor
+	if t.cursor < t.scrollOffset {
+		t.scrollOffset = t.cursor
 	}
 
-	if m.cursor >= m.scrollOffset+maxVisible {
-		m.scrollOffset = m.cursor - maxVisible + 1
+	if t.cursor >= t.scrollOffset+maxVisible {
+		t.scrollOffset = t.cursor - maxVisible + 1
 	}
 
-	if m.scrollOffset > len(m.filesPath)-maxVisible {
-		m.scrollOffset = len(m.filesPath) - maxVisible
+	if t.scrollOffset > len(t.filesPath)-maxVisible {
+		t.scrollOffset = len(t.filesPath) - maxVisible
 	}
-	if m.scrollOffset < 0 {
-		m.scrollOffset = 0
+	if t.scrollOffset < 0 {
+		t.scrollOffset = 0
 	}
 }
 
@@ -147,28 +162,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseMsg:
 		mEvt := msg.Mouse()
+		t := m.curTab()
 		switch mEvt.Button {
 		case tea.MouseWheelUp:
 			if m.activePane == 0 {
-				if m.cursor > 0 {
-					m.cursor--
+				if t.cursor > 0 {
+					t.cursor--
 					m.adjustScroll()
 				}
 			} else {
-				if m.previewScrollOffset > 0 {
-					m.previewScrollOffset--
+				if t.previewScrollOffset > 0 {
+					t.previewScrollOffset--
 				}
 			}
 			return m, nil
 
 		case tea.MouseWheelDown:
 			if m.activePane == 0 {
-				if m.cursor < len(m.filesPath)-1 {
-					m.cursor++
+				if t.cursor < len(t.filesPath)-1 {
+					t.cursor++
 					m.adjustScroll()
 				}
 			} else {
-				m.previewScrollOffset++
+				t.previewScrollOffset++
 			}
 			return m, nil
 
@@ -177,7 +193,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if width < 20 {
 				width = 80
 			}
-			if mEvt.X < width/2 {
+			leftWidth := (width * 2) / 3
+			if mEvt.X < leftWidth {
 				m.activePane = 0
 			} else {
 				m.activePane = 1
@@ -186,21 +203,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyPressMsg:
+		t := m.curTab()
 		if m.copyMenuOpen {
 			switch msg.String() {
 			case "p", "P":
 				m.copyMenuOpen = false
-				if len(m.filesPath) > 0 {
-					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+				if len(t.filesPath) > 0 {
+					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
 					if err := copyToClipboard(absPath); err != nil {
 						m.err = err
 					}
 				}
 			case "n", "N":
 				m.copyMenuOpen = false
-				if len(m.filesPath) > 0 {
-					name := m.filesPath[m.cursor]
-					if !isDir(m.currentDir, name) {
+				if len(t.filesPath) > 0 {
+					name := t.filesPath[t.cursor]
+					if !isDir(t.currentDir, name) {
 						name = strings.TrimSuffix(name, filepath.Ext(name))
 					}
 					if err := copyToClipboard(name); err != nil {
@@ -209,8 +227,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "e", "E":
 				m.copyMenuOpen = false
-				if len(m.filesPath) > 0 {
-					name := m.filesPath[m.cursor]
+				if len(t.filesPath) > 0 {
+					name := t.filesPath[t.cursor]
 					if err := copyToClipboard(name); err != nil {
 						m.err = err
 					}
@@ -226,8 +244,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "p", "P":
 				m.deleteMenuOpen = false
-				if len(m.filesPath) > 0 {
-					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+				if len(t.filesPath) > 0 {
+					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
 					if err := permanentDelete(absPath); err != nil {
 						m.err = err
 					} else {
@@ -236,9 +254,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "r", "R", "n", "N":
 				m.deleteMenuOpen = false
-				if len(m.filesPath) > 0 {
-					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
-					isDirItem := isDir(m.currentDir, m.filesPath[m.cursor])
+				if len(t.filesPath) > 0 {
+					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+					isDirItem := isDir(t.currentDir, t.filesPath[t.cursor])
 					trashPath, err := normalDelete(absPath)
 					if err != nil {
 						m.err = err
@@ -263,8 +281,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "x", "X":
 				m.permissionMenuOpen = false
-				if len(m.filesPath) > 0 {
-					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+				if len(t.filesPath) > 0 {
+					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
 					oldMode, newMode, err := toggleExecutable(absPath)
 					if err != nil {
 						m.err = err
@@ -300,10 +318,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				if m.isRenaming {
-					if len(m.filesPath) > 0 {
-						oldName := m.filesPath[m.cursor]
-						oldPath := findAbsPath(m.currentDir, oldName)
-						newPath := filepath.Join(m.currentDir, m.inputText)
+					if len(t.filesPath) > 0 {
+						oldName := t.filesPath[t.cursor]
+						oldPath := findAbsPath(t.currentDir, oldName)
+						newPath := filepath.Join(t.currentDir, m.inputText)
 						if err := os.Rename(oldPath, newPath); err != nil {
 							m.err = err
 						} else {
@@ -319,7 +337,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 
-				filePath := filepath.Join(m.currentDir, m.inputText)
+				filePath := filepath.Join(t.currentDir, m.inputText)
 
 				if m.isCreatingDir {
 					err := os.Mkdir(filePath, 0755)
@@ -372,7 +390,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "E", "e":
 			m.quitting = true
-			_ = writeTempDirFile(m.currentDir)
+			_ = writeTempDirFile(t.currentDir)
 			return m, tea.Quit
 		case "[", "]":
 			if m.activePane == 0 {
@@ -381,61 +399,105 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activePane = 0
 			}
 
+		// new tab
+		case "t", "T":
+			entries, err := os.ReadDir(t.currentDir)
+			files := []string{}
+			if err == nil {
+				for _, entry := range entries {
+					if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
+						continue
+					}
+					files = append(files, entry.Name())
+				}
+			}
+			newTab := TabState{
+				currentDir: t.currentDir,
+				filesPath:  files,
+			}
+			m.tabs = append(m.tabs, newTab)
+			m.activeTab = len(m.tabs) - 1
+			m.err = nil
+
+		// close tab
+		case "w", "W":
+			if len(m.tabs) > 1 {
+				m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
+				if m.activeTab >= len(m.tabs) {
+					m.activeTab = len(m.tabs) - 1
+				}
+				m.err = nil
+			}
+
+		// switch tab forward
+		case "tab":
+			if len(m.tabs) > 1 {
+				m.activeTab = (m.activeTab + 1) % len(m.tabs)
+				m.err = nil
+			}
+
+		// switch tab backward
+		case "shift+tab":
+			if len(m.tabs) > 1 {
+				m.activeTab = (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
+				m.err = nil
+			}
+
 		case "up", "k":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
 			if m.activePane == 0 {
-				m.previewScrollOffset = 0
-				if m.cursor > 0 {
-					m.cursor--
+				t.previewScrollOffset = 0
+				if t.cursor > 0 {
+					t.cursor--
 				} else {
-					m.cursor = len(m.filesPath) - 1
+					t.cursor = len(t.filesPath) - 1
 				}
 				m.adjustScroll()
 			} else {
-				if m.previewScrollOffset > 0 {
-					m.previewScrollOffset--
+				if t.previewScrollOffset > 0 {
+					t.previewScrollOffset--
 				}
 			}
 		case "down", "j":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
 			if m.activePane == 0 {
-				m.previewScrollOffset = 0
-				if m.cursor < len(m.filesPath)-1 {
-					m.cursor++
+				t.previewScrollOffset = 0
+				if t.cursor < len(t.filesPath)-1 {
+					t.cursor++
 				} else {
-					m.cursor = 0
+					t.cursor = 0
 				}
 				m.adjustScroll()
 			} else {
-				m.previewScrollOffset++
+				t.previewScrollOffset++
 			}
 
 		case "enter", "space":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
-			_, ok := m.selected[m.cursor]
+			_, ok := m.selected[t.cursor]
 			if ok {
-				delete(m.selected, m.cursor)
+				delete(m.selected, t.cursor)
 			} else {
-				m.selected[m.cursor] = struct{}{}
+				m.selected[t.cursor] = struct{}{}
 			}
 
 		// Rename
 		case "r", "R":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
 			m.inputMode = true
 			m.isRenaming = true
-			m.inputText = m.filesPath[m.cursor]
+			m.inputText = t.filesPath[t.cursor]
 
 		// Undo
 		case "u":
@@ -463,11 +525,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// copy file path
 		case "c", "C":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
-			absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+			absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
 			// copy to clipboard
 			if err := copyToClipboard(absPath); err != nil {
 				m.err = err
@@ -475,7 +537,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// copy menu
 		case "y", "Y":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
@@ -483,7 +545,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// delete menu
 		case "d", "D":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
@@ -491,7 +553,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// permission menu
 		case "p", "P":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
@@ -504,12 +566,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// open editor
 		case "o", "O":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
-			name := m.filesPath[m.cursor]
-			if isDir(m.currentDir, name) {
+			name := t.filesPath[t.cursor]
+			if isDir(t.currentDir, name) {
 				break
 			}
 
@@ -518,23 +580,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				editor = "vi"
 			}
 
-			filePath := findAbsPath(m.currentDir, name)
+			filePath := findAbsPath(t.currentDir, name)
 			c := exec.Command(editor, filePath)
 			return m, tea.ExecProcess(c, func(err error) tea.Msg {
 				return editorFinishedMsg{err: err}
 			})
 
 		case "right", "l", "L":
-			if len(m.filesPath) == 0 {
+			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
-			if !isDir(m.currentDir, m.filesPath[m.cursor]) {
+			if !isDir(t.currentDir, t.filesPath[t.cursor]) {
 				break
 			}
 
-			selectedName := m.filesPath[m.cursor]
-			nextDir := findAbsPath(m.currentDir, selectedName)
+			selectedName := t.filesPath[t.cursor]
+			nextDir := findAbsPath(t.currentDir, selectedName)
 
 			entries, err := os.ReadDir(nextDir)
 			if err != nil {
@@ -547,7 +609,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "left", "h", "H":
 			m.err = nil
-			parent := filepath.Dir(m.currentDir)
+			parent := filepath.Dir(t.currentDir)
 			entries, err := os.ReadDir(parent)
 			if err != nil {
 				m.err = err
@@ -572,6 +634,7 @@ func (m model) View() tea.View {
 		return tea.NewView("")
 	}
 
+	t := m.curTab()
 	renderedText := ""
 
 	overhead := 5
@@ -580,18 +643,18 @@ func (m model) View() tea.View {
 		maxVisible = 1
 	}
 
-	endIdx := m.scrollOffset + maxVisible
-	if endIdx > len(m.filesPath) {
-		endIdx = len(m.filesPath)
+	endIdx := t.scrollOffset + maxVisible
+	if endIdx > len(t.filesPath) {
+		endIdx = len(t.filesPath)
 	}
 
-	for i := m.scrollOffset; i < endIdx; i++ {
-		list := m.filesPath[i]
+	for i := t.scrollOffset; i < endIdx; i++ {
+		list := t.filesPath[i]
 
 		icon, fgColor, bgColor := m.CheckDirFilesExt(list)
 
 		cursorSymbol := " "
-		if m.cursor == i {
+		if t.cursor == i {
 			cursorSymbol = ">"
 			renderedText += fmt.Sprintf("%s%s %s %s %s%s%s\n", bgColor, Black, cursorSymbol, icon, list, ItemEndSpace, Reset)
 		} else {
@@ -634,7 +697,10 @@ func (m model) View() tea.View {
 		boxHeight = 3
 	}
 
-	leftWidth := width / 2
+	leftWidth := (width * 2) / 3
+	if leftWidth < 10 {
+		leftWidth = width / 2
+	}
 	rightWidth := width - leftWidth
 
 	leftBorderColor := "#555555"
@@ -654,11 +720,29 @@ func (m model) View() tea.View {
 
 	leftBox := leftStyle.Render(renderedText)
 
-	// Overlay " FMTUI: <currentDir> " on left border
+	// Overlay tabs or " FMTUI: <currentDir> " on left border
 	leftLines := strings.Split(leftBox, "\n")
 	if len(leftLines) > 0 {
 		topLine := []rune(leftLines[0])
-		rawTitle := fmt.Sprintf(" FMTUI: %s ", m.currentDir)
+		var rawTitle string
+		if len(m.tabs) > 1 {
+			var tabParts []string
+			tabParts = append(tabParts, "FMTUI")
+			for i, tb := range m.tabs {
+				dirName := filepath.Base(tb.currentDir)
+				if dirName == "" || dirName == "." {
+					dirName = tb.currentDir
+				}
+				if i == m.activeTab {
+					tabParts = append(tabParts, fmt.Sprintf("[%d: %s]", i+1, dirName))
+				} else {
+					tabParts = append(tabParts, fmt.Sprintf("%d: %s", i+1, dirName))
+				}
+			}
+			rawTitle = " " + strings.Join(tabParts, " | ") + " "
+		} else {
+			rawTitle = fmt.Sprintf(" FMTUI: %s ", t.currentDir)
+		}
 		title := []rune(rawTitle)
 		maxTitleLen := len(topLine) - 4
 		if maxTitleLen > 6 && len(title) > maxTitleLen {
@@ -680,24 +764,24 @@ func (m model) View() tea.View {
 		maxVisiblePreviewLines = 1
 	}
 
-	if len(m.filesPath) > 0 {
-		selectedName := m.filesPath[m.cursor]
-		targetPath := findAbsPath(m.currentDir, selectedName)
-		previewLines := getPreviewLines(targetPath, isDir(m.currentDir, selectedName), m.showHidden)
+	if len(t.filesPath) > 0 {
+		selectedName := t.filesPath[t.cursor]
+		targetPath := findAbsPath(t.currentDir, selectedName)
+		previewLines := getPreviewLines(targetPath, isDir(t.currentDir, selectedName), m.showHidden)
 
 		// Clamp previewScrollOffset based on number of lines and visible height
 		maxScroll := len(previewLines) - maxVisiblePreviewLines
 		if maxScroll < 0 {
 			maxScroll = 0
 		}
-		if m.previewScrollOffset > maxScroll {
-			m.previewScrollOffset = maxScroll
+		if t.previewScrollOffset > maxScroll {
+			t.previewScrollOffset = maxScroll
 		}
-		if m.previewScrollOffset < 0 {
-			m.previewScrollOffset = 0
+		if t.previewScrollOffset < 0 {
+			t.previewScrollOffset = 0
 		}
 
-		endLine := m.previewScrollOffset + maxVisiblePreviewLines
+		endLine := t.previewScrollOffset + maxVisiblePreviewLines
 		if endLine > len(previewLines) {
 			endLine = len(previewLines)
 		}
@@ -707,7 +791,7 @@ func (m model) View() tea.View {
 			maxWidth = 1
 		}
 		var truncatedLines []string
-		for _, line := range previewLines[m.previewScrollOffset:endLine] {
+		for _, line := range previewLines[t.previewScrollOffset:endLine] {
 			expanded := strings.ReplaceAll(line, "\t", "    ")
 			runes := []rune(expanded)
 			if len(runes) > maxWidth {
@@ -749,7 +833,7 @@ func (m model) View() tea.View {
 	if m.showHidden {
 		hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | 'e' exit&cd | '.' hidden:%s | '[' ']' switch pane | 'y' copy | 'd' delete | 'r' rename | 'p' chmod | '`' help", hiddenStatus)
+	helpText := fmt.Sprintf(" Press 'q' to quit | 'e' exit&cd | '.' hidden:%s | '[' ']' switch pane | 't' new tab | 'w' close tab | 'tab' switch tab | 'y' copy | 'd' delete | 'r' rename | 'p' chmod | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
@@ -857,7 +941,9 @@ func (m model) View() tea.View {
 			"Navigation & Panes:\n" +
 			"  j / k, Up / Down   Navigate files / scroll preview\n" +
 			"  h / l, Left / Right Go to parent dir / enter dir\n" +
-			"  [ / ]              Switch active pane\n\n" +
+			"  [ / ]              Switch active pane\n" +
+			"  t / w              New tab / close tab\n" +
+			"  tab / shift+tab    Switch tab next / previous\n\n" +
 			"File Actions:\n" +
 			"  a / m              Create file / directory\n" +
 			"  r                  Rename file or directory\n" +
