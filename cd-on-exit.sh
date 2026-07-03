@@ -1,6 +1,10 @@
 fm() {
-    fmtui 
-    local dir
-    dir=$(cat /tmp/fmtui-dir 2>/dev/null)
-    [ -d "$dir" ] && cd "$dir" 
+    local tmp="${TMPDIR:-/tmp}/fmtui-dir"
+    fmtui "$@"
+    if [ -f "$tmp" ]; then
+        local dir
+        dir=$(cat "$tmp")
+        rm -f "$tmp"
+        [ -d "$dir" ] && cd "$dir"
+    fi
 }
