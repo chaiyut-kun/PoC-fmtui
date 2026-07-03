@@ -66,6 +66,7 @@ type model struct {
 	quitting           bool
 	undoStack          []ActionRecord
 	redoStack          []ActionRecord
+	metadataInspectorOpen bool
 }
 
 func (m *model) curTab() *TabState {
@@ -410,6 +411,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.helpMenuOpen {
 			m.helpMenuOpen = false
+			return m, nil
+		}
+
+		if m.metadataInspectorOpen {
+			m.metadataInspectorOpen = false
 			return m, nil
 		}
 
@@ -862,6 +868,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.permissionMenuOpen = true
 			}
 
+		// Metadata Inspector dialog ('i' / 'I')
+		case "i", "I":
+			if len(t.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			m.metadataInspectorOpen = true
+
 		// help menu page
 		case "`":
 			m.err = nil
@@ -942,9 +956,9 @@ func (m model) View() tea.View {
 	t := m.curTab()
 	renderedText := fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset)
 
-	overhead := 6
+	overhead := 8
 	if m.err != nil || m.inputMode {
-		overhead = 7
+		overhead = 9
 	}
 	maxVisible := m.terminalHeight - overhead
 	if maxVisible < 1 {
@@ -988,6 +1002,13 @@ func (m model) View() tea.View {
 				renderedText += fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, displayName, ItemEndSpace, Reset)
 			}
 		}
+	}
+
+	// Option A: Append metadata summary bar at bottom of File Explorer pane
+	if len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
+		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
+		metaBar := fmt.Sprintf("\n%s─%s %s%s | %s | %s | %s%s", Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
+		renderedText += metaBar
 	}
 
 	if m.inputMode {
@@ -1312,6 +1333,51 @@ func (m model) View() tea.View {
 			"  e                  Exit & cd to current dir in shell\n" +
 			"  q / ctrl+c         Quit application\n\n" +
 			"          Press ` or ESC to close"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
+	// Render Metadata Inspector dialog if open
+	if m.metadataInspectorOpen && len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
+		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
+
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#55FFFF")). // Cyan border
+			Padding(1, 3)
+
+		symlinkLine := ""
+		if meta.IsSymlink {
+			symlinkLine = fmt.Sprintf("Symlink Target: %s\n", meta.SymTarget)
+		}
+
+		dialogContent := fmt.Sprintf("File Metadata Inspector\n\n"+
+			"Name:        %s\n"+
+			"Path:        %s\n"+
+			"Size:        %s (%d bytes)\n"+
+			"Permissions: %s\n"+
+			"Owner/Group: %s\n"+
+			"Modified:    %s\n"+
+			"Type:        %s\n"+
+			"%s\n"+
+			"     Press ESC or any key to close",
+			meta.Name, meta.AbsPath, meta.SizeStr, meta.SizeBytes,
+			meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, meta.MimeOrType, symlinkLine)
 
 		dialog := dialogStyle.Render(dialogContent)
 

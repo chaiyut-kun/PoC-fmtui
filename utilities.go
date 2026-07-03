@@ -609,3 +609,93 @@ func (m *model) performRedo() error {
 	m.reloadCurrentDir()
 	return nil
 }
+
+type FileMetaInfo struct {
+	Name        string
+	AbsPath     string
+	SizeStr     string
+	SizeBytes   int64
+	PermStr     string
+	OwnerGroup  string
+	ModTimeStr  string
+	MimeOrType  string
+	IsDirectory bool
+	IsSymlink   bool
+	SymTarget   string
+}
+
+func getFileMetadataInfo(dir string, name string) FileMetaInfo {
+	meta := FileMetaInfo{
+		Name:    name,
+		AbsPath: findAbsPath(dir, name),
+	}
+	if name == "" {
+		return meta
+	}
+
+	absP := meta.AbsPath
+	lInfo, err := os.Lstat(absP)
+	if err != nil {
+		return meta
+	}
+
+	if lInfo.Mode()&os.ModeSymlink != 0 {
+		meta.IsSymlink = true
+		if target, err := os.Readlink(absP); err == nil {
+			meta.SymTarget = target
+		}
+	}
+
+	info, statErr := os.Stat(absP)
+	if statErr != nil {
+		info = lInfo
+	}
+
+	meta.IsDirectory = info.IsDir()
+	meta.SizeBytes = info.Size()
+	meta.PermStr = fmt.Sprintf("%s (%o)", info.Mode().String(), info.Mode().Perm())
+	meta.ModTimeStr = info.ModTime().Format("2006-01-02 15:04:02")
+
+	if info.IsDir() {
+		entries, err := os.ReadDir(absP)
+		if err == nil {
+			meta.SizeStr = fmt.Sprintf("%d items", len(entries))
+		} else {
+			meta.SizeStr = "directory"
+		}
+		meta.MimeOrType = "Directory"
+	} else {
+		meta.SizeStr = formatFileSize(info.Size())
+		ext := filepath.Ext(name)
+		if ext != "" {
+			meta.MimeOrType = strings.TrimPrefix(ext, ".") + " file"
+		} else {
+			meta.MimeOrType = "File"
+		}
+	}
+
+	meta.OwnerGroup = getOwnerGroupStr()
+	return meta
+}
+
+func formatFileSize(size int64) string {
+	if size < 1024 {
+		return fmt.Sprintf("%d B", size)
+	} else if size < 1024*1024 {
+		return fmt.Sprintf("%.1f KB", float64(size)/1024.0)
+	} else if size < 1024*1024*1024 {
+		return fmt.Sprintf("%.1f MB", float64(size)/(1024.0*1024.0))
+	}
+	return fmt.Sprintf("%.1f GB", float64(size)/(1024.0*1024.0*1024.0))
+}
+
+func getOwnerGroupStr() string {
+	u := os.Getenv("USER")
+	if u == "" {
+		u = os.Getenv("USERNAME")
+	}
+	if u == "" {
+		u = "user"
+	}
+	return u
+}

@@ -782,3 +782,43 @@ func TestSelectAllToggleAction(t *testing.T) {
 	}
 }
 
+func TestMetadataInspectorAction(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "meta_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	filePath := filepath.Join(tempDir, "test_meta.txt")
+	_ = os.WriteFile(filePath, []byte("hello metadata"), 0644)
+
+	meta := getFileMetadataInfo(tempDir, "test_meta.txt")
+	if meta.Name != "test_meta.txt" {
+		t.Errorf("Expected meta.Name to be 'test_meta.txt', got %q", meta.Name)
+	}
+	if meta.SizeBytes != 14 {
+		t.Errorf("Expected meta.SizeBytes to be 14, got %d", meta.SizeBytes)
+	}
+
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().currentDir = tempDir
+	m.curTab().filesPath = []string{"test_meta.txt"}
+	m.curTab().cursor = 0
+
+	// 1. Press "i" to open Metadata Inspector modal
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "i"})
+	m = updatedModel.(model)
+	if !m.metadataInspectorOpen {
+		t.Errorf("Expected metadataInspectorOpen to be true after pressing 'i'")
+	}
+
+	// 2. Press any key (e.g. "esc") to close Metadata Inspector
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+	if m.metadataInspectorOpen {
+		t.Errorf("Expected metadataInspectorOpen to be false after pressing 'esc'")
+	}
+}
+
