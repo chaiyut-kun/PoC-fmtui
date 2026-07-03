@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const tempDirFile = "/tmp/fmtui-dir"
@@ -139,7 +140,7 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 }
 
 func overlayLine(bg string, fg string, startCol int) string {
-	fgVisibleWidth := visibleWidth(fg)
+	fgVisibleWidth := lipgloss.Width(fg)
 
 	var result strings.Builder
 	bgRunes := []rune(bg)
@@ -158,12 +159,13 @@ func overlayLine(bg string, fg string, startCol int) string {
 			continue
 		}
 
-		if visibleCol == startCol {
+		if visibleCol >= startCol {
 			break
 		}
 
+		rw := lipgloss.Width(string(bgRunes[i]))
 		result.WriteRune(bgRunes[i])
-		visibleCol++
+		visibleCol += rw
 		i++
 	}
 
@@ -185,8 +187,9 @@ func overlayLine(bg string, fg string, startCol int) string {
 			}
 			continue
 		}
+		rw := lipgloss.Width(string(bgRunes[i]))
+		skippedWidth += rw
 		i++
-		skippedWidth++
 	}
 
 	for i < len(bgRunes) {
@@ -198,21 +201,7 @@ func overlayLine(bg string, fg string, startCol int) string {
 }
 
 func visibleWidth(s string) int {
-	w := 0
-	runes := []rune(s)
-	i := 0
-	for i < len(runes) {
-		if runes[i] == '\033' {
-			i++
-			for i < len(runes) && runes[i-1] != 'm' {
-				i++
-			}
-			continue
-		}
-		w++
-		i++
-	}
-	return w
+	return lipgloss.Width(s)
 }
 
 func getPreviewLines(path string, isFolder bool, showHidden bool) []string {

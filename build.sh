@@ -1,3 +1,3 @@
 go build -o fmtui
 
-mv fmtui /data/go-workspace/bin
+mv fmtui $(go env GOPATH)/bin

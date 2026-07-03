@@ -817,7 +817,7 @@ func (m model) View() tea.View {
 			"Navigation & Panes:\n" +
 			"  j / k, Up / Down   Navigate files / scroll preview\n" +
 			"  h / l, Left / Right Go to parent dir / enter dir\n" +
-			"  [ / ]  Switch active pane \n\n" +
+			"  [ / ]              Switch active pane\n\n" +
 			"File Actions:\n" +
 			"  a / m              Create file / directory\n" +
 			"  r                  Rename file or directory\n" +
