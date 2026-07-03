@@ -248,31 +248,66 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "p", "P":
 				m.deleteMenuOpen = false
-				if len(t.filesPath) > 0 {
-					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
-					if err := permanentDelete(absPath); err != nil {
-						m.err = err
-					} else {
-						m.reloadCurrentDir()
+				var targetIndices []int
+				if len(m.selected) > 0 {
+					for idx := range m.selected {
+						targetIndices = append(targetIndices, idx)
+					}
+				} else if len(t.filesPath) > 0 {
+					targetIndices = append(targetIndices, t.cursor)
+				}
+
+				deletedCount := 0
+				for _, idx := range targetIndices {
+					if idx >= 0 && idx < len(t.filesPath) {
+						absPath := findAbsPath(t.currentDir, t.filesPath[idx])
+						if err := permanentDelete(absPath); err != nil {
+							m.err = err
+							break
+						}
+						deletedCount++
 					}
 				}
+				m.selected = make(map[int]struct{})
+				if m.err == nil && deletedCount > 0 {
+					m.statusMsg = fmt.Sprintf("Permanently deleted %d item(s)", deletedCount)
+					m.reloadCurrentDir()
+				}
+
 			case "r", "R", "n", "N":
 				m.deleteMenuOpen = false
-				if len(t.filesPath) > 0 {
-					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
-					isDirItem := isDir(t.currentDir, t.filesPath[t.cursor])
-					trashPath, err := normalDelete(absPath)
-					if err != nil {
-						m.err = err
-					} else {
+				var targetIndices []int
+				if len(m.selected) > 0 {
+					for idx := range m.selected {
+						targetIndices = append(targetIndices, idx)
+					}
+				} else if len(t.filesPath) > 0 {
+					targetIndices = append(targetIndices, t.cursor)
+				}
+
+				deletedCount := 0
+				for _, idx := range targetIndices {
+					if idx >= 0 && idx < len(t.filesPath) {
+						absPath := findAbsPath(t.currentDir, t.filesPath[idx])
+						isDirItem := isDir(t.currentDir, t.filesPath[idx])
+						trashPath, err := normalDelete(absPath)
+						if err != nil {
+							m.err = err
+							break
+						}
 						m.pushAction(ActionRecord{
 							Type:         ActionDelete,
 							OriginalPath: absPath,
 							TrashPath:    trashPath,
 							IsDir:        isDirItem,
 						})
-						m.reloadCurrentDir()
+						deletedCount++
 					}
+				}
+				m.selected = make(map[int]struct{})
+				if m.err == nil && deletedCount > 0 {
+					m.statusMsg = fmt.Sprintf("Moved %d item(s) to trash", deletedCount)
+					m.reloadCurrentDir()
 				}
 			default:
 				// Any other key closes the menu (including esc)
@@ -580,7 +615,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = m.performRedo()
 
 		// Create file
-		case "f", "F", "a", "A":
+		case "f", "F":
 			m.err = nil
 			m.inputMode = true
 			m.inputText = ""

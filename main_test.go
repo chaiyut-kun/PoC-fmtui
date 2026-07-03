@@ -582,3 +582,39 @@ func TestSelectionAndCopyMoveAction(t *testing.T) {
 	}
 }
 
+func TestMultiSelectDeleteAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().filesPath = []string{"file1.txt", "file2.txt"}
+	m.curTab().cursor = 0
+
+	// 1. Press space to select file1.txt
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "space"})
+	m = updatedModel.(model)
+	// 2. Press space to select file2.txt
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "space"})
+	m = updatedModel.(model)
+
+	if len(m.selected) != 2 {
+		t.Fatalf("Expected 2 items selected, got %d", len(m.selected))
+	}
+
+	// 3. Press "d" to open delete menu
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "d"})
+	m = updatedModel.(model)
+	if !m.deleteMenuOpen {
+		t.Errorf("Expected deleteMenuOpen to be true")
+	}
+
+	// 4. Press "n" to perform normal delete (trash)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "n"})
+	m = updatedModel.(model)
+	if m.deleteMenuOpen {
+		t.Errorf("Expected deleteMenuOpen to be false")
+	}
+	if len(m.selected) != 0 {
+		t.Errorf("Expected selected map to be cleared after delete, got len %d", len(m.selected))
+	}
+}
+
