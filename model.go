@@ -640,6 +640,79 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.inputText = ""
 			m.isCreatingDir = false
 			m.isRenaming = false
+		case "g", "G":
+			if len(t.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			name := t.filesPath[t.cursor]
+			target, isSym, isBroken := getSymlinkTarget(t.currentDir, name)
+			if !isSym {
+				m.statusMsg = "Not a symbolic link"
+				break
+			}
+			if isBroken {
+				m.err = fmt.Errorf("Symlink target is broken: %s", target)
+				break
+			}
+
+			resolvedTarget := target
+			if !filepath.IsAbs(resolvedTarget) {
+				resolvedTarget = filepath.Join(t.currentDir, target)
+			}
+
+			info, err := os.Stat(resolvedTarget)
+			if err != nil {
+				m.err = err
+				break
+			}
+
+			if info.IsDir() {
+				entries, err := os.ReadDir(resolvedTarget)
+				if err != nil {
+					m.err = err
+					break
+				}
+				m.reLoadDir(resolvedTarget, entries)
+				m.adjustScroll()
+				m.statusMsg = fmt.Sprintf("Jumped to symlink target: %s", resolvedTarget)
+			} else {
+				targetDir := filepath.Dir(resolvedTarget)
+				targetBase := filepath.Base(resolvedTarget)
+				entries, err := os.ReadDir(targetDir)
+				if err != nil {
+					m.err = err
+					break
+				}
+				m.reLoadDir(targetDir, entries)
+				for idx, fname := range t.filesPath {
+					if fname == targetBase {
+						t.cursor = idx
+						break
+					}
+				}
+				m.adjustScroll()
+				m.statusMsg = fmt.Sprintf("Jumped to symlink target file: %s", resolvedTarget)
+			}
+
+		// Create Symlink ('K')
+		case "K":
+			if len(t.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			selectedName := t.filesPath[t.cursor]
+			targetPath := findAbsPath(t.currentDir, selectedName)
+			linkName := fmt.Sprintf("%s_link", selectedName)
+			linkPath := filepath.Join(t.currentDir, linkName)
+
+			if err := os.Symlink(targetPath, linkPath); err != nil {
+				m.err = err
+			} else {
+				m.pushAction(ActionRecord{Type: ActionCreate, OriginalPath: linkPath})
+				m.reloadCurrentDir()
+				m.statusMsg = fmt.Sprintf("Created symlink: %s -> %s", linkName, selectedName)
+			}
 
 		// Move selected / Create Dir
 		case "m", "M":
@@ -867,8 +940,12 @@ func (m model) View() tea.View {
 		list := t.filesPath[i]
 
 		displayName := list
-		if target, isSym := getSymlinkTarget(t.currentDir, list); isSym {
-			displayName = fmt.Sprintf("%s -> %s", list, target)
+		if target, isSym, isBroken := getSymlinkTarget(t.currentDir, list); isSym {
+			if isBroken {
+				displayName = fmt.Sprintf("%s -> %s [Broken]", list, target)
+			} else {
+				displayName = fmt.Sprintf("%s -> %s", list, target)
+			}
 		}
 
 		icon, fgColor, bgColor := m.CheckDirFilesExt(list)
@@ -1054,7 +1131,7 @@ func (m model) View() tea.View {
 	if m.showHidden {
 		hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'c' copy | 'm' move | 'v'/'p' paste | 'e' exit&cd | '.' hidden:%s | 'tab' pane | '[' ']' tab | '`' help", hiddenStatus)
+	helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'c' copy | 'm' move | 'v'/'p' paste | 'g' jump link | 'K' mklink | 'e' exit&cd | '.' hidden:%s | 'tab' pane | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
@@ -1201,7 +1278,9 @@ func (m model) View() tea.View {
 			"  [ / ]              Switch tab prev / next\n" +
 			"  t / w              New tab / close tab\n\n" +
 			"File Actions:\n" +
-			"  f / g              Create file / directory\n" +
+			"  f / m              Create file / directory\n" +
+			"  K                  Create symlink for selected item\n" +
+			"  g                  Jump / follow symlink target\n" +
 			"  r                  Rename file or directory\n" +
 			"  d                  Delete menu (p: permanent, n: trash)\n" +
 			"  y                  Copy menu (p: path, n: name, e: ext, s: tree)\n" +

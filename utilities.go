@@ -160,20 +160,27 @@ func clearTempDirFile() error {
 	return os.Remove(tempDirFile)
 }
 
-func getSymlinkTarget(dir, name string) (string, bool) {
+func getSymlinkTarget(dir, name string) (target string, isSym bool, isBroken bool) {
 	absP := filepath.Join(dir, name)
 	info, err := os.Lstat(absP)
 	if err != nil {
-		return "", false
+		return "", false, false
 	}
 	if info.Mode()&os.ModeSymlink != 0 {
 		target, err := os.Readlink(absP)
-		if err == nil {
-			return target, true
+		if err != nil {
+			return "", true, true
 		}
-		return "", true
+		resolvedPath := target
+		if !filepath.IsAbs(resolvedPath) {
+			resolvedPath = filepath.Join(dir, target)
+		}
+		if _, statErr := os.Stat(resolvedPath); os.IsNotExist(statErr) {
+			return target, true, true
+		}
+		return target, true, false
 	}
-	return "", false
+	return "", false, false
 }
 
 func (m *model) CheckDirFilesExt(list string) (string, string, string) {
@@ -183,10 +190,15 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 	var icon string
 
 	t := m.curTab()
-	if _, isSym := getSymlinkTarget(t.currentDir, list); isSym {
+	if _, isSym, isBroken := getSymlinkTarget(t.currentDir, list); isSym {
 		icon = SymlinkIcon
-		fgColor = Cyan
-		bgColor = BgCyan
+		if isBroken {
+			fgColor = Red
+			bgColor = BgRed
+		} else {
+			fgColor = Cyan
+			bgColor = BgCyan
+		}
 		return icon, fgColor, bgColor
 	}
 

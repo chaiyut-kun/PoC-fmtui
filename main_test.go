@@ -679,12 +679,57 @@ func TestSymlinkDisplay(t *testing.T) {
 		t.Skip("Skipping symlink test due to OS permission restriction")
 	}
 
-	target, isSym := getSymlinkTarget(tempDir, "link_file.txt")
+	target, isSym, isBroken := getSymlinkTarget(tempDir, "link_file.txt")
 	if !isSym {
 		t.Errorf("Expected getSymlinkTarget to return isSym = true")
 	}
+	if isBroken {
+		t.Errorf("Expected isBroken = false for valid symlink")
+	}
 	if target != targetFile {
 		t.Errorf("Expected target to be %q, got %q", targetFile, target)
+	}
+}
+
+func TestCreateAndJumpSymlinkActions(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "symlink_action_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	subDir := filepath.Join(tempDir, "sub_folder")
+	_ = os.MkdirAll(subDir, 0755)
+
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().currentDir = tempDir
+	m.curTab().filesPath = []string{"sub_folder"}
+	m.curTab().cursor = 0
+
+	// 1. Press "K" to create symlink for sub_folder
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "K"})
+	m = updatedModel.(model)
+
+	linkPath := filepath.Join(tempDir, "sub_folder_link")
+	if _, statErr := os.Lstat(linkPath); os.IsNotExist(statErr) {
+		t.Skip("Skipping symlink creation test due to OS permission restriction")
+	}
+
+	// Position cursor on the newly created symlink
+	for idx, name := range m.curTab().filesPath {
+		if name == "sub_folder_link" {
+			m.curTab().cursor = idx
+			break
+		}
+	}
+
+	// 2. Press "g" to jump to symlink target
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "g"})
+	m = updatedModel.(model)
+	if m.curTab().currentDir != subDir {
+		t.Errorf("Expected currentDir to be %q after jump 'g', got %q", subDir, m.curTab().currentDir)
 	}
 }
 
