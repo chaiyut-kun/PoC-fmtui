@@ -68,18 +68,18 @@ func TestPaneSwitchingAndScrolling(t *testing.T) {
 		t.Errorf("Expected activePane to be 0 by default, got %d", m.activePane)
 	}
 
-	// Pressing "[" should switch to activePane 1 (Right Previewer)
-	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "["})
+	// Pressing "tab" should switch to activePane 1 (Right Previewer)
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
 	if m.activePane != 1 {
-		t.Errorf("Expected activePane to be 1 after pressing '[', got %d", m.activePane)
+		t.Errorf("Expected activePane to be 1 after pressing 'tab', got %d", m.activePane)
 	}
 
-	// Pressing "]" should switch back to activePane 0
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "]"})
+	// Pressing "tab" again should switch back to activePane 0
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
 	if m.activePane != 0 {
-		t.Errorf("Expected activePane to switch back to 0 after pressing ']', got %d", m.activePane)
+		t.Errorf("Expected activePane to switch back to 0 after pressing 'tab', got %d", m.activePane)
 	}
 
 	// In activePane 1, pressing down/j should increment previewScrollOffset
@@ -481,18 +481,18 @@ func TestMultiTabsAction(t *testing.T) {
 		t.Errorf("Expected activeTab to be 1 (second tab), got %d", m.activeTab)
 	}
 
-	// 2. Press "tab" to switch to next tab (loops back to 0)
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
+	// 2. Press "]" to switch to next tab (loops back to 0)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "]"})
 	m = updatedModel.(model)
 	if m.activeTab != 0 {
-		t.Errorf("Expected activeTab to be 0 after pressing 'tab', got %d", m.activeTab)
+		t.Errorf("Expected activeTab to be 0 after pressing ']', got %d", m.activeTab)
 	}
 
-	// 3. Press "shift+tab" to switch backward (goes back to 1)
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "shift+tab"})
+	// 3. Press "[" to switch backward (goes back to 1)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "["})
 	m = updatedModel.(model)
 	if m.activeTab != 1 {
-		t.Errorf("Expected activeTab to be 1 after pressing 'shift+tab', got %d", m.activeTab)
+		t.Errorf("Expected activeTab to be 1 after pressing '[', got %d", m.activeTab)
 	}
 
 	// 4. Press "w" to close tab 1

@@ -115,9 +115,9 @@ func (m *model) adjustScroll() {
 		return
 	}
 
-	overhead := 3
+	overhead := 4
 	if m.err != nil || m.inputMode {
-		overhead = 4
+		overhead = 5
 	}
 	maxVisible := m.terminalHeight - overhead
 	if maxVisible < 1 {
@@ -392,11 +392,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			_ = writeTempDirFile(t.currentDir)
 			return m, tea.Quit
-		case "[", "]":
+		// switch active pane
+		case "tab":
 			if m.activePane == 0 {
 				m.activePane = 1
 			} else {
 				m.activePane = 0
+			}
+
+		// switch tab previous
+		case "[":
+			if len(m.tabs) > 1 {
+				m.activeTab = (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
+				m.err = nil
+			}
+
+		// switch tab next
+		case "]":
+			if len(m.tabs) > 1 {
+				m.activeTab = (m.activeTab + 1) % len(m.tabs)
+				m.err = nil
 			}
 
 		// new tab
@@ -426,20 +441,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.activeTab >= len(m.tabs) {
 					m.activeTab = len(m.tabs) - 1
 				}
-				m.err = nil
-			}
-
-		// switch tab forward
-		case "tab":
-			if len(m.tabs) > 1 {
-				m.activeTab = (m.activeTab + 1) % len(m.tabs)
-				m.err = nil
-			}
-
-		// switch tab backward
-		case "shift+tab":
-			if len(m.tabs) > 1 {
-				m.activeTab = (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
 				m.err = nil
 			}
 
@@ -635,9 +636,12 @@ func (m model) View() tea.View {
 	}
 
 	t := m.curTab()
-	renderedText := ""
+	renderedText := fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset)
 
-	overhead := 5
+	overhead := 6
+	if m.err != nil || m.inputMode {
+		overhead = 7
+	}
 	maxVisible := m.terminalHeight - overhead
 	if maxVisible < 1 {
 		maxVisible = 1
@@ -720,33 +724,27 @@ func (m model) View() tea.View {
 
 	leftBox := leftStyle.Render(renderedText)
 
-	// Overlay tabs or " FMTUI: <currentDir> " on left border
+	// Overlay tabs on left border
 	leftLines := strings.Split(leftBox, "\n")
 	if len(leftLines) > 0 {
 		topLine := []rune(leftLines[0])
-		var rawTitle string
-		if len(m.tabs) > 1 {
-			var tabParts []string
-			tabParts = append(tabParts, "FMTUI")
-			for i, tb := range m.tabs {
-				dirName := filepath.Base(tb.currentDir)
-				if dirName == "" || dirName == "." {
-					dirName = tb.currentDir
-				}
-				if i == m.activeTab {
-					tabParts = append(tabParts, fmt.Sprintf("[%d: %s]", i+1, dirName))
-				} else {
-					tabParts = append(tabParts, fmt.Sprintf("%d: %s", i+1, dirName))
-				}
+		var tabParts []string
+		for i, tb := range m.tabs {
+			dirName := filepath.Base(tb.currentDir)
+			if dirName == "" || dirName == "." || dirName == "/" {
+				dirName = tb.currentDir
 			}
-			rawTitle = " " + strings.Join(tabParts, " | ") + " "
-		} else {
-			rawTitle = fmt.Sprintf(" FMTUI: %s ", t.currentDir)
+			if i == m.activeTab {
+				tabParts = append(tabParts, fmt.Sprintf("[%s]", dirName))
+			} else {
+				tabParts = append(tabParts, dirName)
+			}
 		}
+		rawTitle := " " + strings.Join(tabParts, " | ") + " "
 		title := []rune(rawTitle)
 		maxTitleLen := len(topLine) - 4
 		if maxTitleLen > 6 && len(title) > maxTitleLen {
-			pathTrimmed := " FMTUI: ..." + string(title[len(title)-(maxTitleLen-8):])
+			pathTrimmed := " ..." + string(title[len(title)-(maxTitleLen-4):])
 			title = []rune(pathTrimmed)
 		}
 		startIdx := (len(topLine) - len(title)) / 2
@@ -833,7 +831,7 @@ func (m model) View() tea.View {
 	if m.showHidden {
 		hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | 'e' exit&cd | '.' hidden:%s | '[' ']' switch pane | 't' new tab | 'w' close tab | 'tab' switch tab | 'y' copy | 'd' delete | 'r' rename | 'p' chmod | '`' help", hiddenStatus)
+	helpText := fmt.Sprintf(" Press 'q' to quit | 'e' exit&cd | '.' hidden:%s | 'tab' switch pane | '[' ']' switch tab | 't' new tab | 'w' close tab | 'y' copy | 'd' delete | 'r' rename | 'p' chmod | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
@@ -941,9 +939,9 @@ func (m model) View() tea.View {
 			"Navigation & Panes:\n" +
 			"  j / k, Up / Down   Navigate files / scroll preview\n" +
 			"  h / l, Left / Right Go to parent dir / enter dir\n" +
-			"  [ / ]              Switch active pane\n" +
-			"  t / w              New tab / close tab\n" +
-			"  tab / shift+tab    Switch tab next / previous\n\n" +
+			"  tab                Switch active pane\n" +
+			"  [ / ]              Switch tab prev / next\n" +
+			"  t / w              New tab / close tab\n\n" +
 			"File Actions:\n" +
 			"  a / m              Create file / directory\n" +
 			"  r                  Rename file or directory\n" +

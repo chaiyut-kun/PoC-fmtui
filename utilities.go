@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -12,6 +13,17 @@ import (
 )
 
 const tempDirFile = "/tmp/fmtui-dir"
+
+func getCurrentUser() string {
+	u := os.Getenv("USER")
+	if u != "" {
+		return u
+	}
+	if usr, err := user.Current(); err == nil && usr.Username != "" {
+		return usr.Username
+	}
+	return "user"
+}
 
 // copy to clipboard
 func copyToClipboard(text string) error {
