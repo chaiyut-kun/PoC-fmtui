@@ -425,3 +425,40 @@ func TestHelpMenuAction(t *testing.T) {
 	}
 }
 
+func TestMouseScrollAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.filesPath = []string{"file1.txt", "file2.txt", "file3.txt"}
+	m.cursor = 0
+	m.activePane = 0
+
+	// 1. Mouse Wheel Down in Pane 0 -> cursor moves down to 1
+	updatedModel, _ := m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
+	m = updatedModel.(model)
+	if m.cursor != 1 {
+		t.Errorf("Expected cursor to be 1 after MouseWheelDown, got %d", m.cursor)
+	}
+
+	// 2. Mouse Wheel Up in Pane 0 -> cursor moves up to 0
+	updatedModel, _ = m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelUp}))
+	m = updatedModel.(model)
+	if m.cursor != 0 {
+		t.Errorf("Expected cursor to be 0 after MouseWheelUp, got %d", m.cursor)
+	}
+
+	// 3. Mouse Click on right half -> activePane switches to 1
+	updatedModel, _ = m.Update(tea.MouseClickMsg(tea.Mouse{Button: tea.MouseLeft, X: 60, Y: 10}))
+	m = updatedModel.(model)
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to be 1 after clicking right pane, got %d", m.activePane)
+	}
+
+	// 4. Mouse Wheel Down in Pane 1 -> previewScrollOffset increments to 1
+	updatedModel, _ = m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
+	m = updatedModel.(model)
+	if m.previewScrollOffset != 1 {
+		t.Errorf("Expected previewScrollOffset to be 1 after MouseWheelDown in Pane 1, got %d", m.previewScrollOffset)
+	}
+}
+

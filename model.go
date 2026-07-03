@@ -145,6 +145,46 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.adjustScroll()
 		return m, nil
 
+	case tea.MouseMsg:
+		mEvt := msg.Mouse()
+		switch mEvt.Button {
+		case tea.MouseWheelUp:
+			if m.activePane == 0 {
+				if m.cursor > 0 {
+					m.cursor--
+					m.adjustScroll()
+				}
+			} else {
+				if m.previewScrollOffset > 0 {
+					m.previewScrollOffset--
+				}
+			}
+			return m, nil
+
+		case tea.MouseWheelDown:
+			if m.activePane == 0 {
+				if m.cursor < len(m.filesPath)-1 {
+					m.cursor++
+					m.adjustScroll()
+				}
+			} else {
+				m.previewScrollOffset++
+			}
+			return m, nil
+
+		case tea.MouseLeft:
+			width := m.terminalWidth
+			if width < 20 {
+				width = 80
+			}
+			if mEvt.X < width/2 {
+				m.activePane = 0
+			} else {
+				m.activePane = 1
+			}
+			return m, nil
+		}
+
 	case tea.KeyPressMsg:
 		if m.copyMenuOpen {
 			switch msg.String() {
@@ -851,5 +891,8 @@ func (m model) View() tea.View {
 		content = strings.Join(bgLines, "\n")
 	}
 
-	return tea.NewView(content)
+	v := tea.NewView(content)
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
