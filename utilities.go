@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/lipgloss"
 )
 
-const tempDirFile = "/tmp/fmtui-dir"
+var tempDirFile = filepath.Join(os.TempDir(), "fmtui-dir")
 
 func getCurrentUser() string {
 	u := os.Getenv("USER")
@@ -23,6 +25,28 @@ func getCurrentUser() string {
 		return usr.Username
 	}
 	return "user"
+}
+
+func openWithVSCode(targetPath string) error {
+	cmd := exec.Command("code", targetPath)
+	return cmd.Start()
+}
+
+func revealInFileExplorer(targetPath string) error {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", "-R", targetPath)
+	case "windows":
+		cmd = exec.Command("explorer.exe", "/select,", targetPath)
+	default: // linux, etc.
+		dir := targetPath
+		if fi, err := os.Stat(targetPath); err == nil && !fi.IsDir() {
+			dir = filepath.Dir(targetPath)
+		}
+		cmd = exec.Command("xdg-open", dir)
+	}
+	return cmd.Start()
 }
 
 // copy to clipboard

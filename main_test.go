@@ -506,3 +506,30 @@ func TestMultiTabsAction(t *testing.T) {
 	}
 }
 
+func TestOpenMenuAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().filesPath = []string{"test_file.txt"}
+	m.curTab().cursor = 0
+
+	// 1. Press "o" to open open menu
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "o"})
+	m = updatedModel.(model)
+	if !m.openMenuOpen {
+		t.Errorf("Expected openMenuOpen to be true after pressing 'o'")
+	}
+
+	view := m.View()
+	if !strings.Contains(view.Content, "Open Menu") {
+		t.Errorf("Expected view content to display 'Open Menu' overlay, view: %q", view.Content)
+	}
+
+	// 2. Press "esc" to close open menu
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+	if m.openMenuOpen {
+		t.Errorf("Expected openMenuOpen to be false after pressing 'esc'")
+	}
+}
+

@@ -54,6 +54,7 @@ type model struct {
 	copyMenuOpen        bool
 	deleteMenuOpen      bool
 	permissionMenuOpen  bool
+	openMenuOpen        bool
 	helpMenuOpen        bool
 	activePane          int // 0 = Left (FM), 1 = Right (Preview)
 	quitting            bool
@@ -299,6 +300,48 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			default:
 				// Any other key closes the menu (including esc)
 				m.permissionMenuOpen = false
+			}
+			return m, nil
+		}
+
+		if m.openMenuOpen {
+			switch msg.String() {
+			case "c", "C":
+				m.openMenuOpen = false
+				if len(t.filesPath) > 0 {
+					targetPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+					if err := openWithVSCode(targetPath); err != nil {
+						m.err = err
+					}
+				}
+			case "r", "R":
+				m.openMenuOpen = false
+				if len(t.filesPath) > 0 {
+					targetPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+					if err := revealInFileExplorer(targetPath); err != nil {
+						m.err = err
+					}
+				}
+			case "e", "E":
+				m.openMenuOpen = false
+				if len(t.filesPath) > 0 {
+					name := t.filesPath[t.cursor]
+					if isDir(t.currentDir, name) {
+						break
+					}
+					editor := os.Getenv("EDITOR")
+					if editor == "" {
+						editor = "vi"
+					}
+					filePath := findAbsPath(t.currentDir, name)
+					c := exec.Command(editor, filePath)
+					return m, tea.ExecProcess(c, func(err error) tea.Msg {
+						return editorFinishedMsg{err: err}
+					})
+				}
+			default:
+				// Any other key closes the menu (including esc)
+				m.openMenuOpen = false
 			}
 			return m, nil
 		}
@@ -565,27 +608,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.helpMenuOpen = true
 
-		// open editor
+		// open menu
 		case "o", "O":
 			if len(t.filesPath) == 0 {
 				break
 			}
 			m.err = nil
-			name := t.filesPath[t.cursor]
-			if isDir(t.currentDir, name) {
-				break
-			}
-
-			editor := os.Getenv("EDITOR")
-			if editor == "" {
-				editor = "vi"
-			}
-
-			filePath := findAbsPath(t.currentDir, name)
-			c := exec.Command(editor, filePath)
-			return m, tea.ExecProcess(c, func(err error) tea.Msg {
-				return editorFinishedMsg{err: err}
-			})
+			m.openMenuOpen = true
 
 		case "right", "l", "L":
 			if len(t.filesPath) == 0 {
@@ -928,6 +957,37 @@ func (m model) View() tea.View {
 		content = strings.Join(bgLines, "\n")
 	}
 
+	// Render open menu if open
+	if m.openMenuOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#FF55FF")). // Purple border
+			Padding(1, 2)
+
+		dialogContent := "    Open Menu\n\n" +
+			"[c] Open with VSCode (code)\n" +
+			"[r] Reveal in GUI File Explorer\n" +
+			"[e] Open with $EDITOR\n\n" +
+			"Press ESC to cancel"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
 	// Render full help menu if open
 	if m.helpMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
@@ -948,7 +1008,7 @@ func (m model) View() tea.View {
 			"  d                  Delete menu (p: permanent, n: trash)\n" +
 			"  y                  Copy menu (p: path, n: name, e: ext)\n" +
 			"  p                  Permission menu (x: chmod +x/-x)\n" +
-			"  o                  Open file in $EDITOR\n" +
+			"  o                  Open menu (c: VSCode, r: GUI, e: $EDITOR)\n" +
 			"  .                  Toggle hidden files\n\n" +
 			"Undo / Redo & Exit:\n" +
 			"  u                  Undo action\n" +
