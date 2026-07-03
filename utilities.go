@@ -160,6 +160,22 @@ func clearTempDirFile() error {
 	return os.Remove(tempDirFile)
 }
 
+func getSymlinkTarget(dir, name string) (string, bool) {
+	absP := filepath.Join(dir, name)
+	info, err := os.Lstat(absP)
+	if err != nil {
+		return "", false
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(absP)
+		if err == nil {
+			return target, true
+		}
+		return "", true
+	}
+	return "", false
+}
+
 func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 
 	var fgColor string
@@ -167,6 +183,13 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 	var icon string
 
 	t := m.curTab()
+	if _, isSym := getSymlinkTarget(t.currentDir, list); isSym {
+		icon = SymlinkIcon
+		fgColor = Cyan
+		bgColor = BgCyan
+		return icon, fgColor, bgColor
+	}
+
 	if isDir(t.currentDir, list) {
 
 		if list == ".git" {

@@ -866,6 +866,11 @@ func (m model) View() tea.View {
 	for i := t.scrollOffset; i < endIdx; i++ {
 		list := t.filesPath[i]
 
+		displayName := list
+		if target, isSym := getSymlinkTarget(t.currentDir, list); isSym {
+			displayName = fmt.Sprintf("%s -> %s", list, target)
+		}
+
 		icon, fgColor, bgColor := m.CheckDirFilesExt(list)
 
 		cursorSymbol := " "
@@ -878,12 +883,12 @@ func (m model) View() tea.View {
 		}
 
 		if t.cursor == i {
-			renderedText += fmt.Sprintf("%s%s %s%s %s %s%s%s\n", bgColor, Black, cursorSymbol, selectMarker, icon, list, ItemEndSpace, Reset)
+			renderedText += fmt.Sprintf("%s%s %s%s %s %s%s%s\n", bgColor, Black, cursorSymbol, selectMarker, icon, displayName, ItemEndSpace, Reset)
 		} else {
 			if fgColor == Reset {
-				renderedText += fmt.Sprintf(" %s%s %s %s%s\n", cursorSymbol, selectMarker, icon, list, ItemEndSpace)
+				renderedText += fmt.Sprintf(" %s%s %s %s%s\n", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
 			} else {
-				renderedText += fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, list, ItemEndSpace, Reset)
+				renderedText += fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, displayName, ItemEndSpace, Reset)
 			}
 		}
 	}

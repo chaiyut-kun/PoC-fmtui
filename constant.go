@@ -39,6 +39,7 @@ const (
 	BashIcon = "\uebca"
 	MdIcon   = "\ueeab"
 	PdfIcon  = "\uf1c1"
-	GitIcon  = "\ue709"
-	JsonIcon = "\ue60b"
+	GitIcon     = "\ue709"
+	JsonIcon    = "\ue60b"
+	SymlinkIcon = "🔗"
 )

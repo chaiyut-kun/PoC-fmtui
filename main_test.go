@@ -663,3 +663,28 @@ func TestCopyDirStructureAction(t *testing.T) {
 	}
 }
 
+func TestSymlinkDisplay(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "symlink_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	targetFile := filepath.Join(tempDir, "real_file.txt")
+	_ = os.WriteFile(targetFile, []byte("hello"), 0644)
+
+	linkFile := filepath.Join(tempDir, "link_file.txt")
+	err = os.Symlink(targetFile, linkFile)
+	if err != nil {
+		t.Skip("Skipping symlink test due to OS permission restriction")
+	}
+
+	target, isSym := getSymlinkTarget(tempDir, "link_file.txt")
+	if !isSym {
+		t.Errorf("Expected getSymlinkTarget to return isSym = true")
+	}
+	if target != targetFile {
+		t.Errorf("Expected target to be %q, got %q", targetFile, target)
+	}
+}
+
