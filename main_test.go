@@ -525,11 +525,60 @@ func TestOpenMenuAction(t *testing.T) {
 		t.Errorf("Expected view content to display 'Open Menu' overlay, view: %q", view.Content)
 	}
 
-	// 2. Press "esc" to close open menu
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	// 2. Press "c" inside menu -> opens CWD in VSCode & closes dialog
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "c"})
 	m = updatedModel.(model)
 	if m.openMenuOpen {
-		t.Errorf("Expected openMenuOpen to be false after pressing 'esc'")
+		t.Errorf("Expected openMenuOpen to be false after pressing 'c'")
+	}
+
+	// 3. Open menu again and press "C" -> opens selected item in VSCode & closes dialog
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "o"})
+	m = updatedModel.(model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "C"})
+	m = updatedModel.(model)
+	if m.openMenuOpen {
+		t.Errorf("Expected openMenuOpen to be false after pressing 'C'")
+	}
+}
+
+func TestSelectionAndCopyMoveAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	m.curTab().filesPath = []string{"file1.txt", "file2.txt"}
+	m.curTab().cursor = 0
+
+	// 1. Press space to select file1.txt
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "space"})
+	m = updatedModel.(model)
+	if _, ok := m.selected[0]; !ok {
+		t.Errorf("Expected item at index 0 to be selected")
+	}
+	if m.curTab().cursor != 1 {
+		t.Errorf("Expected cursor to advance to 1, got %d", m.curTab().cursor)
+	}
+
+	// 2. Press "c" to stage selected items for copy
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "c"})
+	m = updatedModel.(model)
+	if len(m.stagedPaths) != 1 {
+		t.Fatalf("Expected 1 staged path for copy, got %d", len(m.stagedPaths))
+	}
+	if m.stagedOp != "copy" {
+		t.Errorf("Expected stagedOp to be 'copy', got %q", m.stagedOp)
+	}
+
+	// 3. Select file2.txt and press "m" to stage for move
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "space"})
+	m = updatedModel.(model)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "m"})
+	m = updatedModel.(model)
+	if len(m.stagedPaths) != 1 {
+		t.Fatalf("Expected 1 staged path for move, got %d", len(m.stagedPaths))
+	}
+	if m.stagedOp != "move" {
+		t.Errorf("Expected stagedOp to be 'move', got %q", m.stagedOp)
 	}
 }
 

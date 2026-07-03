@@ -40,26 +40,29 @@ type TabState struct {
 }
 
 type model struct {
-	tabs                []TabState
-	activeTab           int
-	selected            map[int]struct{}
-	showHidden          bool
-	err                 error
-	terminalHeight      int
-	terminalWidth       int
-	inputMode           bool
-	inputText           string
-	isCreatingDir       bool
-	isRenaming          bool
-	copyMenuOpen        bool
-	deleteMenuOpen      bool
-	permissionMenuOpen  bool
-	openMenuOpen        bool
-	helpMenuOpen        bool
-	activePane          int // 0 = Left (FM), 1 = Right (Preview)
-	quitting            bool
-	undoStack           []ActionRecord
-	redoStack           []ActionRecord
+	tabs               []TabState
+	activeTab          int
+	selected           map[int]struct{}
+	showHidden         bool
+	err                error
+	terminalHeight     int
+	terminalWidth      int
+	inputMode          bool
+	inputText          string
+	isCreatingDir      bool
+	isRenaming         bool
+	copyMenuOpen       bool
+	deleteMenuOpen     bool
+	permissionMenuOpen bool
+	openMenuOpen       bool
+	helpMenuOpen       bool
+	activePane         int // 0 = Left (FM), 1 = Right (Preview)
+	stagedPaths        []string
+	stagedOp           string
+	statusMsg          string
+	quitting           bool
+	undoStack          []ActionRecord
+	redoStack          []ActionRecord
 }
 
 func (m *model) curTab() *TabState {
@@ -306,7 +309,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.openMenuOpen {
 			switch msg.String() {
-			case "c", "C":
+			case "c":
+				m.openMenuOpen = false
+				if err := openWithVSCode(t.currentDir); err != nil {
+					m.err = err
+				}
+			case "C":
 				m.openMenuOpen = false
 				if len(t.filesPath) > 0 {
 					targetPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
@@ -522,7 +530,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				t.previewScrollOffset++
 			}
 
-		case "enter", "space":
+		case "space":
 			if len(t.filesPath) == 0 {
 				break
 			}
@@ -531,6 +539,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				delete(m.selected, t.cursor)
 			} else {
 				m.selected[t.cursor] = struct{}{}
+			}
+			if t.cursor < len(t.filesPath)-1 {
+				t.cursor++
+				m.adjustScroll()
+			}
+
+		case "enter":
+			if len(t.filesPath) == 0 {
+				break
+			}
+			if isDir(t.currentDir, t.filesPath[t.cursor]) {
+				selectedName := t.filesPath[t.cursor]
+				nextDir := findAbsPath(t.currentDir, selectedName)
+				entries, err := os.ReadDir(nextDir)
+				if err != nil {
+					m.err = err
+					break
+				}
+				m.reLoadDir(nextDir, entries)
+				m.adjustScroll()
 			}
 
 		// Rename
@@ -552,31 +580,88 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = m.performRedo()
 
 		// Create file
-		case "a", "A":
+		case "f", "F", "a", "A":
 			m.err = nil
 			m.inputMode = true
 			m.inputText = ""
 			m.isCreatingDir = false
 			m.isRenaming = false
 
-		// Create Dir
+		// Move selected / Create Dir
 		case "m", "M":
 			m.err = nil
-			m.inputMode = true
-			m.inputText = ""
-			m.isCreatingDir = true
-			m.isRenaming = false
+			if len(m.selected) > 0 {
+				m.stagedPaths = nil
+				for idx := range m.selected {
+					if idx >= 0 && idx < len(t.filesPath) {
+						absP := findAbsPath(t.currentDir, t.filesPath[idx])
+						m.stagedPaths = append(m.stagedPaths, absP)
+					}
+				}
+				m.stagedOp = "move"
+				m.selected = make(map[int]struct{})
+				m.statusMsg = fmt.Sprintf("Staged %d item(s) to move. Press 'v' or 'p' to paste.", len(m.stagedPaths))
+			} else {
+				m.inputMode = true
+				m.inputText = ""
+				m.isCreatingDir = true
+				m.isRenaming = false
+			}
 
-		// copy file path
+		// Copy selected / copy file path
 		case "c", "C":
-			if len(t.filesPath) == 0 {
+			m.err = nil
+			if len(m.selected) > 0 {
+				m.stagedPaths = nil
+				for idx := range m.selected {
+					if idx >= 0 && idx < len(t.filesPath) {
+						absP := findAbsPath(t.currentDir, t.filesPath[idx])
+						m.stagedPaths = append(m.stagedPaths, absP)
+					}
+				}
+				m.stagedOp = "copy"
+				m.selected = make(map[int]struct{})
+				m.statusMsg = fmt.Sprintf("Copied %d item(s). Press 'v' or 'p' to paste.", len(m.stagedPaths))
+			} else if len(t.filesPath) > 0 {
+				absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+				if err := copyToClipboard(absPath); err != nil {
+					m.err = err
+				} else {
+					m.statusMsg = "Copied path to clipboard"
+				}
+			}
+
+		// Paste staged files
+		case "v", "V":
+			if len(m.stagedPaths) == 0 {
 				break
 			}
 			m.err = nil
-			absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
-			// copy to clipboard
-			if err := copyToClipboard(absPath); err != nil {
-				m.err = err
+			pastedCount := 0
+			for _, srcPath := range m.stagedPaths {
+				baseName := filepath.Base(srcPath)
+				dstPath := filepath.Join(t.currentDir, baseName)
+				if m.stagedOp == "copy" {
+					if err := copyFileOrDir(srcPath, dstPath); err != nil {
+						m.err = err
+						break
+					}
+					m.pushAction(ActionRecord{Type: ActionCreate, OriginalPath: dstPath})
+					pastedCount++
+				} else if m.stagedOp == "move" {
+					if err := moveFileOrDir(srcPath, dstPath); err != nil {
+						m.err = err
+						break
+					}
+					m.pushAction(ActionRecord{Type: ActionRename, OldPath: srcPath, NewPath: dstPath})
+					pastedCount++
+				}
+			}
+			if m.err == nil {
+				m.statusMsg = fmt.Sprintf("Successfully performed %s for %d item(s)", m.stagedOp, pastedCount)
+				m.stagedPaths = nil
+				m.stagedOp = ""
+				m.reloadCurrentDir()
 			}
 
 		// copy menu
@@ -595,13 +680,40 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.deleteMenuOpen = true
 
-		// permission menu
+		// permission menu / paste
 		case "p", "P":
-			if len(t.filesPath) == 0 {
-				break
+			if len(m.stagedPaths) > 0 {
+				m.err = nil
+				pastedCount := 0
+				for _, srcPath := range m.stagedPaths {
+					baseName := filepath.Base(srcPath)
+					dstPath := filepath.Join(t.currentDir, baseName)
+					if m.stagedOp == "copy" {
+						if err := copyFileOrDir(srcPath, dstPath); err != nil {
+							m.err = err
+							break
+						}
+						m.pushAction(ActionRecord{Type: ActionCreate, OriginalPath: dstPath})
+						pastedCount++
+					} else if m.stagedOp == "move" {
+						if err := moveFileOrDir(srcPath, dstPath); err != nil {
+							m.err = err
+							break
+						}
+						m.pushAction(ActionRecord{Type: ActionRename, OldPath: srcPath, NewPath: dstPath})
+						pastedCount++
+					}
+				}
+				if m.err == nil {
+					m.statusMsg = fmt.Sprintf("Successfully performed %s for %d item(s)", m.stagedOp, pastedCount)
+					m.stagedPaths = nil
+					m.stagedOp = ""
+					m.reloadCurrentDir()
+				}
+			} else if len(t.filesPath) > 0 {
+				m.err = nil
+				m.permissionMenuOpen = true
 			}
-			m.err = nil
-			m.permissionMenuOpen = true
 
 		// help menu page
 		case "`":
@@ -689,12 +801,19 @@ func (m model) View() tea.View {
 		cursorSymbol := " "
 		if t.cursor == i {
 			cursorSymbol = ">"
-			renderedText += fmt.Sprintf("%s%s %s %s %s%s%s\n", bgColor, Black, cursorSymbol, icon, list, ItemEndSpace, Reset)
+		}
+		selectMarker := " "
+		if _, ok := m.selected[i]; ok {
+			selectMarker = fmt.Sprintf("%s*%s", Yellow, Reset)
+		}
+
+		if t.cursor == i {
+			renderedText += fmt.Sprintf("%s%s %s%s %s %s%s%s\n", bgColor, Black, cursorSymbol, selectMarker, icon, list, ItemEndSpace, Reset)
 		} else {
 			if fgColor == Reset {
-				renderedText += fmt.Sprintf(" %s %s %s%s\n", cursorSymbol, icon, list, ItemEndSpace)
+				renderedText += fmt.Sprintf(" %s%s %s %s%s\n", cursorSymbol, selectMarker, icon, list, ItemEndSpace)
 			} else {
-				renderedText += fmt.Sprintf(" %s %s%s %s%s%s \n", cursorSymbol, fgColor, icon, list, ItemEndSpace, Reset)
+				renderedText += fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, list, ItemEndSpace, Reset)
 			}
 		}
 	}
@@ -860,10 +979,12 @@ func (m model) View() tea.View {
 	if m.showHidden {
 		hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | 'e' exit&cd | '.' hidden:%s | 'tab' switch pane | '[' ']' switch tab | 't' new tab | 'w' close tab | 'y' copy | 'd' delete | 'r' rename | 'p' chmod | '`' help", hiddenStatus)
+	helpText := fmt.Sprintf(" Press 'q' to quit | 'space' select | 'c' copy | 'm' move | 'v'/'p' paste | 'e' exit&cd | '.' hidden:%s | 'tab' pane | '[' ']' tab | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
+	} else if m.statusMsg != "" {
+		content += fmt.Sprintf("\n%s%s%s", Green, m.statusMsg, Reset)
 	}
 	content += "\n" + helpText
 
@@ -964,8 +1085,9 @@ func (m model) View() tea.View {
 			BorderForeground(lipgloss.Color("#FF55FF")). // Purple border
 			Padding(1, 2)
 
-		dialogContent := "    Open Menu\n\n" +
-			"[c] Open with VSCode (code)\n" +
+		dialogContent := "       Open Menu\n\n" +
+			"[c] Open CWD with VSCode (code .)\n" +
+			"[C] Open selected with VSCode\n" +
 			"[r] Reveal in GUI File Explorer\n" +
 			"[e] Open with $EDITOR\n\n" +
 			"Press ESC to cancel"
@@ -1003,12 +1125,12 @@ func (m model) View() tea.View {
 			"  [ / ]              Switch tab prev / next\n" +
 			"  t / w              New tab / close tab\n\n" +
 			"File Actions:\n" +
-			"  a / m              Create file / directory\n" +
+			"  f / g              Create file / directory\n" +
 			"  r                  Rename file or directory\n" +
 			"  d                  Delete menu (p: permanent, n: trash)\n" +
 			"  y                  Copy menu (p: path, n: name, e: ext)\n" +
 			"  p                  Permission menu (x: chmod +x/-x)\n" +
-			"  o                  Open menu (c: VSCode, r: GUI, e: $EDITOR)\n" +
+			"  o                  Open menu [c: VSCode CWD, C: VSCode item, r: GUI, e: $EDITOR]\n" +
 			"  .                  Toggle hidden files\n\n" +
 			"Undo / Redo & Exit:\n" +
 			"  u                  Undo action\n" +

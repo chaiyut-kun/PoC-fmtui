@@ -348,6 +348,17 @@ func copyDir(src, dst string) error {
 	return nil
 }
 
+func copyFileOrDir(src, dst string) error {
+	info, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return copyDir(src, dst)
+	}
+	return copyFile(src, dst)
+}
+
 func moveFileOrDir(src, dst string) error {
 	// Try atomic rename first
 	err := os.Rename(src, dst)
