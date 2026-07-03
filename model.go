@@ -5,11 +5,31 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss"
 )
+
+type ActionType string
+
+const (
+	ActionDelete ActionType = "delete"
+	ActionCreate ActionType = "create"
+	ActionRename ActionType = "rename"
+	ActionChmod  ActionType = "chmod"
+)
+
+type ActionRecord struct {
+	Type         ActionType
+	OriginalPath string
+	TrashPath    string
+	OldPath      string
+	NewPath      string
+	OldMode      os.FileMode
+	NewMode      os.FileMode
+	IsDir        bool
+}
 
 type model struct {
 	filesPath           []string
@@ -24,10 +44,16 @@ type model struct {
 	inputMode           bool
 	inputText           string
 	isCreatingDir       bool
+	isRenaming          bool
 	copyMenuOpen        bool
+	deleteMenuOpen      bool
+	permissionMenuOpen  bool
+	helpMenuOpen        bool
 	activePane          int // 0 = Left (FM), 1 = Right (Preview)
 	previewScrollOffset int // vertical scroll offset for preview
 	quitting            bool
+	undoStack           []ActionRecord
+	redoStack           []ActionRecord
 }
 
 type editorFinishedMsg struct {
@@ -50,6 +76,9 @@ func InitialModel() model {
 
 	files := []string{}
 	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
 		files = append(files, entry.Name())
 	}
 
@@ -71,8 +100,10 @@ func (m *model) adjustScroll() {
 		return
 	}
 
-	// overhead is 5: borders (2 lines) + footer (2 lines) + optional error (1 line)
-	overhead := 5
+	overhead := 3
+	if m.err != nil || m.inputMode {
+		overhead = 4
+	}
 	maxVisible := m.terminalHeight - overhead
 	if maxVisible < 1 {
 		maxVisible = 1
@@ -151,13 +182,103 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		if m.deleteMenuOpen {
+			switch msg.String() {
+			case "p", "P":
+				m.deleteMenuOpen = false
+				if len(m.filesPath) > 0 {
+					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+					if err := permanentDelete(absPath); err != nil {
+						m.err = err
+					} else {
+						m.reloadCurrentDir()
+					}
+				}
+			case "r", "R", "n", "N":
+				m.deleteMenuOpen = false
+				if len(m.filesPath) > 0 {
+					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+					isDirItem := isDir(m.currentDir, m.filesPath[m.cursor])
+					trashPath, err := normalDelete(absPath)
+					if err != nil {
+						m.err = err
+					} else {
+						m.pushAction(ActionRecord{
+							Type:         ActionDelete,
+							OriginalPath: absPath,
+							TrashPath:    trashPath,
+							IsDir:        isDirItem,
+						})
+						m.reloadCurrentDir()
+					}
+				}
+			default:
+				// Any other key closes the menu (including esc)
+				m.deleteMenuOpen = false
+			}
+			return m, nil
+		}
+
+		if m.permissionMenuOpen {
+			switch msg.String() {
+			case "x", "X":
+				m.permissionMenuOpen = false
+				if len(m.filesPath) > 0 {
+					absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
+					oldMode, newMode, err := toggleExecutable(absPath)
+					if err != nil {
+						m.err = err
+					} else {
+						m.pushAction(ActionRecord{
+							Type:         ActionChmod,
+							OriginalPath: absPath,
+							OldMode:      oldMode,
+							NewMode:      newMode,
+						})
+						m.reloadCurrentDir()
+					}
+				}
+			default:
+				// Any other key closes the menu (including esc)
+				m.permissionMenuOpen = false
+			}
+			return m, nil
+		}
+
+		if m.helpMenuOpen {
+			m.helpMenuOpen = false
+			return m, nil
+		}
+
 		if m.inputMode {
 			switch msg.String() {
 			case "enter":
 				m.inputMode = false
 				if m.inputText == "" {
+					m.isRenaming = false
 					break
 				}
+
+				if m.isRenaming {
+					if len(m.filesPath) > 0 {
+						oldName := m.filesPath[m.cursor]
+						oldPath := findAbsPath(m.currentDir, oldName)
+						newPath := filepath.Join(m.currentDir, m.inputText)
+						if err := os.Rename(oldPath, newPath); err != nil {
+							m.err = err
+						} else {
+							m.pushAction(ActionRecord{
+								Type:    ActionRename,
+								OldPath: oldPath,
+								NewPath: newPath,
+							})
+							m.reloadCurrentDir()
+						}
+					}
+					m.isRenaming = false
+					break
+				}
+
 				filePath := filepath.Join(m.currentDir, m.inputText)
 
 				if m.isCreatingDir {
@@ -166,6 +287,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.err = err
 						break
 					}
+					m.pushAction(ActionRecord{
+						Type:         ActionCreate,
+						OriginalPath: filePath,
+						IsDir:        true,
+					})
 				} else {
 					file, err := os.Create(filePath)
 					if err != nil {
@@ -173,18 +299,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						break
 					}
 					file.Close()
+					m.pushAction(ActionRecord{
+						Type:         ActionCreate,
+						OriginalPath: filePath,
+						IsDir:        false,
+					})
 				}
 
-				entries, err := os.ReadDir(m.currentDir)
-				if err != nil {
-					m.err = err
-					break
-				}
-				m.reLoadDir(m.currentDir, entries)
+				m.reloadCurrentDir()
 				m.adjustScroll()
 			case "esc":
 				m.inputMode = false
 				m.inputText = ""
+				m.isRenaming = false
 			case "backspace":
 				if len(m.inputText) > 0 {
 					m.inputText = m.inputText[:len(m.inputText)-1]
@@ -203,7 +330,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			_ = clearTempDirFile()
 			m.quitting = true
 			return m, tea.Quit
-		case "d", "D":
+		case "E", "e":
 			m.quitting = true
 			_ = writeTempDirFile(m.currentDir)
 			return m, tea.Quit
@@ -250,6 +377,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "enter", "space":
+			if len(m.filesPath) == 0 {
+				break
+			}
 			_, ok := m.selected[m.cursor]
 			if ok {
 				delete(m.selected, m.cursor)
@@ -257,17 +387,50 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selected[m.cursor] = struct{}{}
 			}
 
-		case "a", "A":
-			if err := m.AddTask("Some task"); err != nil {
-				fmt.Println(err.Error())
+		// Rename
+		case "r", "R":
+			if len(m.filesPath) == 0 {
+				break
 			}
+			m.err = nil
+			m.inputMode = true
+			m.isRenaming = true
+			m.inputText = m.filesPath[m.cursor]
+
+		// Undo
+		case "u":
+			m.err = m.performUndo()
+
+		// Redo
+		case "ctrl+r", "U":
+			m.err = m.performRedo()
+
+		// Create file
+		case "a", "A":
+			m.err = nil
+			m.inputMode = true
+			m.inputText = ""
+			m.isCreatingDir = false
+			m.isRenaming = false
+
+		// Create Dir
+		case "m", "M":
+			m.err = nil
+			m.inputMode = true
+			m.inputText = ""
+			m.isCreatingDir = true
+			m.isRenaming = false
 
 		// copy file path
 		case "c", "C":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
 			absPath := findAbsPath(m.currentDir, m.filesPath[m.cursor])
 			// copy to clipboard
 			if err := copyToClipboard(absPath); err != nil {
-				fmt.Println(err.Error())
+				m.err = err
 			}
 
 		// copy menu
@@ -277,6 +440,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.err = nil
 			m.copyMenuOpen = true
+
+		// delete menu
+		case "d", "D":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			m.deleteMenuOpen = true
+
+		// permission menu
+		case "p", "P":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
+			m.permissionMenuOpen = true
+
+		// help menu page
+		case "`":
+			m.err = nil
+			m.helpMenuOpen = true
 
 		// open editor
 		case "o", "O":
@@ -301,8 +485,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			})
 
 		case "right", "l", "L":
+			if len(m.filesPath) == 0 {
+				break
+			}
+			m.err = nil
 			if !isDir(m.currentDir, m.filesPath[m.cursor]) {
-				return m, nil
+				break
 			}
 
 			selectedName := m.filesPath[m.cursor]
@@ -310,10 +498,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			entries, err := os.ReadDir(nextDir)
 			if err != nil {
-				fmt.Println(err.Error())
+				m.err = err
+				break
 			}
 
 			m.reLoadDir(nextDir, entries)
+			m.adjustScroll()
 
 		case "left", "h", "H":
 			m.err = nil
@@ -350,26 +540,37 @@ func (m model) View() tea.View {
 		maxVisible = 1
 	}
 
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-		}
+	endIdx := m.scrollOffset + maxVisible
+	if endIdx > len(m.filesPath) {
+		endIdx = len(m.filesPath)
+	}
 
-		if isDir(m.currentDir, list) {
-			list = fmt.Sprintf("%s%s%s", Blue, list, Reset)
-		}
-		renderedText += fmt.Sprintf("\nCreate %s: %s█\n(Enter to confirm, Esc to cancel)\n", prompt, m.inputText)
-	} else {
-		if m.err != nil {
-			renderedText += fmt.Sprintf("\n%sError: %v%s\n", Red, m.err, Reset)
+	for i := m.scrollOffset; i < endIdx; i++ {
+		list := m.filesPath[i]
+
+		icon, fgColor, bgColor := m.CheckDirFilesExt(list)
+
+		cursorSymbol := " "
+		if m.cursor == i {
+			cursorSymbol = ">"
+			renderedText += fmt.Sprintf("%s%s %s %s %s%s%s\n", bgColor, Black, cursorSymbol, icon, list, ItemEndSpace, Reset)
 		} else {
-			renderedText += "\n"
+			if fgColor == Reset {
+				renderedText += fmt.Sprintf(" %s %s %s%s\n", cursorSymbol, icon, list, ItemEndSpace)
+			} else {
+				renderedText += fmt.Sprintf(" %s %s%s %s%s%s \n", cursorSymbol, fgColor, icon, list, ItemEndSpace, Reset)
+			}
 		}
-		hiddenStatus := "OFF"
-		if m.showHidden {
-			hiddenStatus = "ON "
+	}
+
+	if m.inputMode {
+		prompt := "Create file"
+		if m.isRenaming {
+			prompt = "Rename"
+		} else if m.isCreatingDir {
+			prompt = "Create directory"
 		}
-		renderedText += fmt.Sprintf("Press 'q' to quit.\t| Press 'd' to cd.\t| '.' hidden:%s\n", hiddenStatus)
+		renderedText += fmt.Sprintf("\n%s: %s█\n(Enter to confirm, Esc to cancel)", prompt, m.inputText)
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
@@ -382,6 +583,15 @@ func (m model) View() tea.View {
 	}
 	if height < 5 {
 		height = 20
+	}
+
+	bottomBarLines := 1
+	if m.err != nil {
+		bottomBarLines = 2
+	}
+	boxHeight := height - bottomBarLines
+	if boxHeight < 3 {
+		boxHeight = 3
 	}
 
 	leftWidth := width / 2
@@ -400,15 +610,21 @@ func (m model) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
 		Width(leftWidth - 2).
-		Height(height - 2)
+		Height(boxHeight - 2)
 
 	leftBox := leftStyle.Render(renderedText)
 
-	// Overlay " FMTUI " on left border
+	// Overlay " FMTUI: <currentDir> " on left border
 	leftLines := strings.Split(leftBox, "\n")
 	if len(leftLines) > 0 {
 		topLine := []rune(leftLines[0])
-		title := []rune(" FMTUI ")
+		rawTitle := fmt.Sprintf(" FMTUI: %s ", m.currentDir)
+		title := []rune(rawTitle)
+		maxTitleLen := len(topLine) - 4
+		if maxTitleLen > 6 && len(title) > maxTitleLen {
+			pathTrimmed := " FMTUI: ..." + string(title[len(title)-(maxTitleLen-8):])
+			title = []rune(pathTrimmed)
+		}
 		startIdx := (len(topLine) - len(title)) / 2
 		if startIdx > 0 && startIdx+len(title) < len(topLine) {
 			copy(topLine[startIdx:], title)
@@ -419,7 +635,7 @@ func (m model) View() tea.View {
 
 	// 2. Create right box (Previewer)
 	var rightText string
-	maxVisiblePreviewLines := height - 4
+	maxVisiblePreviewLines := boxHeight - 2
 	if maxVisiblePreviewLines < 1 {
 		maxVisiblePreviewLines = 1
 	}
@@ -468,7 +684,7 @@ func (m model) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(rightBorderColor)).
 		Width(rightWidth - 2).
-		Height(height - 2)
+		Height(boxHeight - 2)
 
 	rightBox := rightStyle.Render(rightText)
 
@@ -487,6 +703,18 @@ func (m model) View() tea.View {
 
 	// Join both boxes horizontally
 	content := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+
+	// Bottom Help & Error Status Bar
+	hiddenStatus := "OFF"
+	if m.showHidden {
+		hiddenStatus = "ON"
+	}
+	helpText := fmt.Sprintf(" Press 'q' to quit | 'e' exit&cd | '.' hidden:%s | '[' ']' switch pane | 'y' copy | 'd' delete | 'r' rename | 'p' chmod | '`' help", hiddenStatus)
+
+	if m.err != nil {
+		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
+	}
+	content += "\n" + helpText
 
 	// Render copy menu if open
 	if m.copyMenuOpen {
@@ -519,14 +747,109 @@ func (m model) View() tea.View {
 		content = strings.Join(bgLines, "\n")
 	}
 
-	return tea.NewView(content)
-}
+	// Render delete menu if open
+	if m.deleteMenuOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#FF5555")). // Red border
+			Padding(1, 2)
 
-func (m *model) AddTask(task string) error {
-	m.filesPath = append(m.filesPath, task)
-	if !slices.Contains(m.filesPath, task) {
-		return fmt.Errorf("%sHas an error to create task%s\n", Red, Reset)
+		dialogContent := "Delete Menu\n\n" +
+			"[p] Permanent delete\n" +
+			"[n] Normal delete (Trash)\n\n" +
+			"Press ESC to cancel"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
 	}
 
-	return nil
+	// Render permission menu if open
+	if m.permissionMenuOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#55FFFF")). // Cyan border
+			Padding(1, 2)
+
+		dialogContent := "  Permission Menu\n\n" +
+			"[x] Toggle executable (chmod +x/-x)\n\n" +
+			"Press ESC to cancel"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
+	// Render full help menu if open
+	if m.helpMenuOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#FFFF55")). // Yellow border
+			Padding(1, 4)
+
+		dialogContent := "FMTUI Help Menu\n\n" +
+			"Navigation & Panes:\n" +
+			"  j / k, Up / Down   Navigate files / scroll preview\n" +
+			"  h / l, Left / Right Go to parent dir / enter dir\n" +
+			"  [ / ]  Switch active pane \n\n" +
+			"File Actions:\n" +
+			"  a / m              Create file / directory\n" +
+			"  r                  Rename file or directory\n" +
+			"  d                  Delete menu (p: permanent, n: trash)\n" +
+			"  y                  Copy menu (p: path, n: name, e: ext)\n" +
+			"  p                  Permission menu (x: chmod +x/-x)\n" +
+			"  o                  Open file in $EDITOR\n" +
+			"  .                  Toggle hidden files\n\n" +
+			"Undo / Redo & Exit:\n" +
+			"  u                  Undo action\n" +
+			"  ctrl+r / U         Redo action\n" +
+			"  e                  Exit & cd to current dir in shell\n" +
+			"  q / ctrl+c         Quit application\n\n" +
+			"          Press ` or ESC to close"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
+	return tea.NewView(content)
 }

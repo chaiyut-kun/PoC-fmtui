@@ -141,3 +141,287 @@ func TestPreviewLineTruncation(t *testing.T) {
 	}
 }
 
+func TestDeleteAction(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "test_delete_action_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+
+	m := InitialModel()
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.currentDir = filepath.Dir(tempPath)
+	m.filesPath = []string{filepath.Base(tempPath)}
+	m.cursor = 0
+
+	// 1. Pressing "d" opens delete menu
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "d"})
+	m = updatedModel.(model)
+	if !m.deleteMenuOpen {
+		t.Errorf("Expected deleteMenuOpen to be true after pressing 'd'")
+	}
+
+	view := m.View()
+	if !strings.Contains(view.Content, "Delete Menu") {
+		t.Errorf("Expected view to contain 'Delete Menu' dialog overlay")
+	}
+
+	// 2. Pressing "p" performs permanent delete
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "p"})
+	m = updatedModel.(model)
+	if m.deleteMenuOpen {
+		t.Errorf("Expected deleteMenuOpen to be false after pressing 'p'")
+	}
+	if _, err := os.Stat(tempPath); !os.IsNotExist(err) {
+		t.Errorf("Expected file to be deleted from disk, but it still exists")
+	}
+}
+
+func TestRenameAction(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test_rename_dir_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	oldPath := filepath.Join(tempDir, "old_name.txt")
+	os.WriteFile(oldPath, []byte("hello"), 0644)
+
+	m := InitialModel()
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.currentDir = tempDir
+	m.filesPath = []string{"old_name.txt"}
+	m.cursor = 0
+
+	// Press "r" to trigger rename
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "r"})
+	m = updatedModel.(model)
+	if !m.isRenaming || !m.inputMode {
+		t.Errorf("Expected isRenaming and inputMode to be true after pressing 'r'")
+	}
+
+	// Change text to "new_name.txt"
+	m.inputText = "new_name.txt"
+
+	// Press "enter" to confirm rename
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = updatedModel.(model)
+
+	newPath := filepath.Join(tempDir, "new_name.txt")
+	if _, err := os.Stat(newPath); os.IsNotExist(err) {
+		t.Errorf("Expected file to be renamed to %s, but it does not exist", newPath)
+	}
+}
+
+func TestUndoRedo(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test_undo_redo_dir_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	m := InitialModel()
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.currentDir = tempDir
+	m.filesPath = []string{}
+	m.cursor = 0
+
+	// 1. Create file "created_file.txt"
+	m.inputMode = true
+	m.inputText = "created_file.txt"
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = updatedModel.(model)
+
+	createdPath := filepath.Join(tempDir, "created_file.txt")
+	if _, err := os.Stat(createdPath); os.IsNotExist(err) {
+		t.Fatalf("Expected created_file.txt to exist")
+	}
+
+	// 2. Undo creation (press "u")
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "u"})
+	m = updatedModel.(model)
+	if _, err := os.Stat(createdPath); !os.IsNotExist(err) {
+		t.Errorf("Expected created_file.txt to be removed after undo")
+	}
+
+	// 3. Redo creation (press "ctrl+r")
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+r"})
+	m = updatedModel.(model)
+	if _, err := os.Stat(createdPath); os.IsNotExist(err) {
+		t.Errorf("Expected created_file.txt to be restored after redo")
+	}
+}
+
+func TestNormalDeleteAndUndo(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "test_normal_delete_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+
+	m := InitialModel()
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.currentDir = filepath.Dir(tempPath)
+	m.filesPath = []string{filepath.Base(tempPath)}
+	m.cursor = 0
+
+	// 1. Press "d" to open delete menu
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "d"})
+	m = updatedModel.(model)
+
+	// 2. Press "r" for normal delete (Trash)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "r"})
+	m = updatedModel.(model)
+
+	if m.err != nil {
+		t.Fatalf("Normal delete failed with error: %v", m.err)
+	}
+
+	// Verify file was moved out of original location
+	if _, err := os.Stat(tempPath); !os.IsNotExist(err) {
+		t.Errorf("Expected file to be removed from original location after normal delete")
+	}
+
+	// 3. Press "u" to undo normal delete (restore from Trash)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "u"})
+	m = updatedModel.(model)
+
+	if m.err != nil {
+		t.Fatalf("Undo normal delete failed with error: %v", m.err)
+	}
+
+	// Verify file was restored to original location
+	if _, err := os.Stat(tempPath); os.IsNotExist(err) {
+		t.Errorf("Expected file to be restored to original location after pressing 'u'")
+	}
+
+	// Clean up restored file
+	_ = os.Remove(tempPath)
+}
+
+func TestShowCurrentPathInTopBorder(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test_path_border_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	m := InitialModel()
+	m.terminalWidth = 120
+	m.terminalHeight = 24
+	m.currentDir = tempDir
+	m.filesPath = []string{}
+
+	view := m.View()
+	if !strings.Contains(view.Content, tempDir) {
+		t.Errorf("Expected top border to contain current directory %q, view: %q", tempDir, view.Content)
+	}
+}
+
+func TestBottomHelpMessage(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 120
+	m.terminalHeight = 24
+
+	view := m.View()
+	lines := strings.Split(view.Content, "\n")
+	if len(lines) == 0 {
+		t.Fatalf("Expected non-empty rendered view")
+	}
+
+	lastLine := lines[len(lines)-1]
+	if !strings.Contains(lastLine, "Press 'q' to quit") {
+		t.Errorf("Expected bottom line to contain help message, got: %q", lastLine)
+	}
+}
+
+func TestChmodExecutableAction(t *testing.T) {
+	tempFile, err := os.CreateTemp("", "test_chmod_*.sh")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	tempPath := tempFile.Name()
+	tempFile.Close()
+
+	// Set initial mode to non-executable (0644)
+	_ = os.Chmod(tempPath, 0644)
+	defer os.Remove(tempPath)
+
+	m := InitialModel()
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.currentDir = filepath.Dir(tempPath)
+	m.filesPath = []string{filepath.Base(tempPath)}
+	m.cursor = 0
+
+	// 1. Press "p" to open permission menu
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "p"})
+	m = updatedModel.(model)
+	if !m.permissionMenuOpen {
+		t.Errorf("Expected permissionMenuOpen to be true after pressing 'p'")
+	}
+
+	view := m.View()
+	if !strings.Contains(view.Content, "Permission Menu") {
+		t.Errorf("Expected view to contain 'Permission Menu' dialog overlay")
+	}
+
+	// 2. Press "x" to toggle executable bit (+x)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "x"})
+	m = updatedModel.(model)
+	if m.permissionMenuOpen {
+		t.Errorf("Expected permissionMenuOpen to be false after pressing 'x'")
+	}
+
+	info, err := os.Stat(tempPath)
+	if err != nil {
+		t.Fatalf("Failed to stat temp file: %v", err)
+	}
+	if info.Mode()&0111 == 0 {
+		t.Errorf("Expected executable bit to be set after pressing 'x', mode: %o", info.Mode())
+	}
+
+	// 3. Press "u" to undo chmod
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "u"})
+	m = updatedModel.(model)
+
+	info, err = os.Stat(tempPath)
+	if err != nil {
+		t.Fatalf("Failed to stat temp file after undo: %v", err)
+	}
+	if info.Mode()&0111 != 0 {
+		t.Errorf("Expected executable bit to be restored (non-executable) after undo, mode: %o", info.Mode())
+	}
+}
+
+func TestHelpMenuAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+
+	// 1. Press "`" to open help menu
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "`"})
+	m = updatedModel.(model)
+	if !m.helpMenuOpen {
+		t.Errorf("Expected helpMenuOpen to be true after pressing '`'")
+	}
+
+	view := m.View()
+	if !strings.Contains(view.Content, "FMTUI Help Menu") {
+		t.Errorf("Expected view content to display 'FMTUI Help Menu' overlay")
+	}
+
+	// 2. Press "esc" to close help menu
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+	if m.helpMenuOpen {
+		t.Errorf("Expected helpMenuOpen to be false after pressing 'esc'")
+	}
+}
+
