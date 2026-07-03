@@ -5,11 +5,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss"
 )
+
+type subshellFinishedMsg struct{ err error }
 
 type ActionType string
 
@@ -151,6 +154,14 @@ func (m *model) adjustScroll() {
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case editorFinishedMsg:
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.reloadCurrentDir()
+		}
+		return m, nil
+
+	case subshellFinishedMsg:
 		if msg.err != nil {
 			m.err = msg.err
 		} else {
@@ -755,6 +766,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.helpMenuOpen = true
 
+		// Temporary switch to shell
+		case ":":
+			shell := os.Getenv("SHELL")
+			if shell == "" {
+				if runtime.GOOS == "windows" {
+					shell = "cmd.exe"
+				} else {
+					shell = "/bin/sh"
+				}
+			}
+			c := exec.Command(shell)
+			c.Dir = t.currentDir
+			return m, tea.ExecProcess(c, func(err error) tea.Msg {
+				return subshellFinishedMsg{err: err}
+			})
+
 		// open menu
 		case "o", "O":
 			if len(t.filesPath) == 0 {
@@ -1014,7 +1041,7 @@ func (m model) View() tea.View {
 	if m.showHidden {
 		hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | 'space' select | 'c' copy | 'm' move | 'v'/'p' paste | 'e' exit&cd | '.' hidden:%s | 'tab' pane | '[' ']' tab | '`' help", hiddenStatus)
+	helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'c' copy | 'm' move | 'v'/'p' paste | 'e' exit&cd | '.' hidden:%s | 'tab' pane | '[' ']' tab | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
@@ -1167,9 +1194,7 @@ func (m model) View() tea.View {
 			"  p                  Permission menu (x: chmod +x/-x)\n" +
 			"  o                  Open menu [c: VSCode CWD, C: VSCode item, r: GUI, e: $EDITOR]\n" +
 			"  .                  Toggle hidden files\n\n" +
-			"Undo / Redo & Exit:\n" +
-			"  u                  Undo action\n" +
-			"  ctrl+r / U         Redo action\n" +
+			"  :              	  Temporary switch to subshell (type exit or ctrl+d to return)\n" +
 			"  e                  Exit & cd to current dir in shell\n" +
 			"  q / ctrl+c         Quit application\n\n" +
 			"          Press ` or ESC to close"

@@ -618,3 +618,22 @@ func TestMultiSelectDeleteAction(t *testing.T) {
 	}
 }
 
+func TestSubshellAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+
+	// Press "!" to trigger subshell command
+	_, cmd := m.Update(tea.KeyPressMsg{Text: "!"})
+	if cmd == nil {
+		t.Errorf("Expected non-nil tea.Cmd for subshell command on '!' key")
+	}
+
+	// Test completion msg handler
+	updatedModel, _ := m.Update(subshellFinishedMsg{err: nil})
+	m = updatedModel.(model)
+	if m.err != nil {
+		t.Errorf("Expected m.err to be nil after subshellFinishedMsg")
+	}
+}
+
