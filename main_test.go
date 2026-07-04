@@ -63,27 +63,27 @@ func TestPaneSwitchingAndScrolling(t *testing.T) {
 	m := InitialModel()
 	m.tabs[m.activeTab].filesPath = []string{"file1.txt", "file2.txt"}
 	
-	// Default active pane should be 0 (Left Explorer)
-	if m.activePane != 0 {
-		t.Errorf("Expected activePane to be 0 by default, got %d", m.activePane)
+	// Default active pane should be 1 (Left Explorer)
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to be 1 by default, got %d", m.activePane)
 	}
 
-	// Pressing "tab" should switch to activePane 1 (Right Previewer)
+	// Pressing "tab" should switch to activePane 2 (Right Previewer)
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
-	if m.activePane != 1 {
-		t.Errorf("Expected activePane to be 1 after pressing 'tab', got %d", m.activePane)
+	if m.activePane != 2 {
+		t.Errorf("Expected activePane to be 2 after pressing 'tab', got %d", m.activePane)
 	}
 
-	// Pressing "tab" again should switch back to activePane 0
+	// Pressing "tab" again should switch back to activePane 0 (Shortcut Sidebar)
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
 	if m.activePane != 0 {
-		t.Errorf("Expected activePane to switch back to 0 after pressing 'tab', got %d", m.activePane)
+		t.Errorf("Expected activePane to switch to 0 after pressing 'tab', got %d", m.activePane)
 	}
 
-	// In activePane 1, pressing down/j should increment previewScrollOffset
-	m.activePane = 1
+	// In activePane 2, pressing down/j should increment previewScrollOffset
+	m.activePane = 2
 	m.curTab().previewScrollOffset = 0
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
 	m = updatedModel.(model)
@@ -91,8 +91,8 @@ func TestPaneSwitchingAndScrolling(t *testing.T) {
 		t.Errorf("Expected previewScrollOffset to be 1 after pressing 'j' in right pane, got %d", m.curTab().previewScrollOffset)
 	}
 
-	// In activePane 0, pressing down/j should move file cursor instead of scrolling preview
-	m.activePane = 0
+	// In activePane 1, pressing down/j should move file cursor instead of scrolling preview
+	m.activePane = 1
 	m.curTab().cursor = 0
 	m.curTab().previewScrollOffset = 5
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
@@ -109,6 +109,7 @@ func TestPreviewLineTruncation(t *testing.T) {
 	m := InitialModel()
 	m.terminalWidth = 60
 	m.terminalHeight = 10
+	m.shortcutPaneOpen = false
 	
 	tempFile, err := os.CreateTemp("", "test_preview_truncation_*.txt")
 	if err != nil {
@@ -431,34 +432,34 @@ func TestMouseScrollAction(t *testing.T) {
 	m.terminalHeight = 30
 	m.tabs[m.activeTab].filesPath = []string{"file1.txt", "file2.txt", "file3.txt"}
 	m.tabs[m.activeTab].cursor = 0
-	m.activePane = 0
+	m.activePane = 1
 
-	// 1. Mouse Wheel Down in Pane 0 -> cursor moves down to 1
+	// 1. Mouse Wheel Down in Pane 1 -> cursor moves down to 1
 	updatedModel, _ := m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
 	m = updatedModel.(model)
 	if m.curTab().cursor != 1 {
 		t.Errorf("Expected cursor to be 1 after MouseWheelDown, got %d", m.curTab().cursor)
 	}
 
-	// 2. Mouse Wheel Up in Pane 0 -> cursor moves up to 0
+	// 2. Mouse Wheel Up in Pane 1 -> cursor moves up to 0
 	updatedModel, _ = m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelUp}))
 	m = updatedModel.(model)
 	if m.curTab().cursor != 0 {
 		t.Errorf("Expected cursor to be 0 after MouseWheelUp, got %d", m.curTab().cursor)
 	}
 
-	// 3. Mouse Click on right pane -> activePane switches to 1
-	updatedModel, _ = m.Update(tea.MouseClickMsg(tea.Mouse{Button: tea.MouseLeft, X: 80, Y: 10}))
+	// 3. Mouse Click on right pane -> activePane switches to 2
+	updatedModel, _ = m.Update(tea.MouseClickMsg(tea.Mouse{Button: tea.MouseLeft, X: 90, Y: 10}))
 	m = updatedModel.(model)
-	if m.activePane != 1 {
-		t.Errorf("Expected activePane to be 1 after clicking right pane, got %d", m.activePane)
+	if m.activePane != 2 {
+		t.Errorf("Expected activePane to be 2 after clicking right pane, got %d", m.activePane)
 	}
 
-	// 4. Mouse Wheel Down in Pane 1 -> previewScrollOffset increments to 1
+	// 4. Mouse Wheel Down in Pane 2 -> previewScrollOffset increments to 1
 	updatedModel, _ = m.Update(tea.MouseWheelMsg(tea.Mouse{Button: tea.MouseWheelDown}))
 	m = updatedModel.(model)
 	if m.curTab().previewScrollOffset != 1 {
-		t.Errorf("Expected previewScrollOffset to be 1 after MouseWheelDown in Pane 1, got %d", m.curTab().previewScrollOffset)
+		t.Errorf("Expected previewScrollOffset to be 1 after MouseWheelDown in Pane 2, got %d", m.curTab().previewScrollOffset)
 	}
 }
 
@@ -832,11 +833,29 @@ func TestShortcutPaneAction(t *testing.T) {
 		t.Fatalf("Expected shortcuts to be populated, got 0")
 	}
 
-	// 1. Press "ctrl+b" to open shortcut pane
+	// Since shortcutPaneOpen is true by default, press "ctrl+b" to close it, then "ctrl+b" to open it
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
 	m = updatedModel.(model)
+	if m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be false after pressing 'ctrl+b'")
+	}
+
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	m = updatedModel.(model)
 	if !m.shortcutPaneOpen {
-		t.Errorf("Expected shortcutPaneOpen to be true after pressing 'ctrl+b'")
+		t.Errorf("Expected shortcutPaneOpen to be true after pressing 'ctrl+b' again")
+	}
+
+	// Focus the shortcut pane by pressing "1"
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "1"})
+	m = updatedModel.(model)
+	if m.activePane != 0 {
+		t.Errorf("Expected activePane to be 0 after pressing '1', got %d", m.activePane)
+	}
+
+	view := m.View()
+	if !strings.Contains(view.Content, "──") {
+		t.Errorf("Expected shortcut pane to render path separator line")
 	}
 
 	// 2. Press "j" to navigate down in shortcut pane
@@ -846,11 +865,155 @@ func TestShortcutPaneAction(t *testing.T) {
 		t.Errorf("Expected shortcutCursor to be 1 after 'j', got %d", m.shortcutCursor)
 	}
 
+	view = m.View()
+	baseDirName := filepath.Base(m.shortcuts[1].Path)
+	if !strings.Contains(view.Content, baseDirName) {
+		t.Errorf("Expected view to contain active shortcut path base %q", baseDirName)
+	}
+
 	// 3. Press "esc" to close shortcut pane
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
 	m = updatedModel.(model)
 	if m.shortcutPaneOpen {
 		t.Errorf("Expected shortcutPaneOpen to be false after pressing 'esc'")
+	}
+}
+
+func TestBookmarkActionsAndSwitching(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+
+	// 1. Press "b" to open bookmark dialog
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "b"})
+	m = updatedModel.(model)
+	if !m.bookmarkMenuOpen {
+		t.Errorf("Expected bookmarkMenuOpen to be true after pressing 'b'")
+	}
+
+	// 2. Press "c" to bookmark current directory (CWD)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "c"})
+	m = updatedModel.(model)
+	if m.bookmarkMenuOpen {
+		t.Errorf("Expected bookmarkMenuOpen to be false after pressing 'c'")
+	}
+	if len(m.bookmarks) != 1 {
+		t.Fatalf("Expected bookmarks count to be 1, got %d", len(m.bookmarks))
+	}
+	cwd, _ := os.Getwd()
+	if m.bookmarks[0].Path != cwd {
+		t.Errorf("Expected bookmarked path to be %s, got %s", cwd, m.bookmarks[0].Path)
+	}
+
+	// 3. Since shortcutPaneOpen is true by default, press ctrl+b to close it, then ctrl+b to open it
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	m = updatedModel.(model)
+	if m.shortcutPaneOpen {
+		t.Fatalf("Expected shortcutPaneOpen to be false after pressing 'ctrl+b'")
+	}
+
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	m = updatedModel.(model)
+	if !m.shortcutPaneOpen {
+		t.Fatalf("Expected shortcutPaneOpen to be true after pressing 'ctrl+b' again")
+	}
+
+	// Focus the shortcut pane by pressing "1"
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "1"})
+	m = updatedModel.(model)
+	if m.activePane != 0 {
+		t.Fatalf("Expected activePane to be 0 after pressing '1', got %d", m.activePane)
+	}
+
+	// Default tab is 0
+	if m.shortcutTab != 0 {
+		t.Errorf("Expected default shortcutTab to be 0, got %d", m.shortcutTab)
+	}
+
+	// 4. Press "]" to switch to user bookmarks tab
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "]"})
+	m = updatedModel.(model)
+	if m.shortcutTab != 1 {
+		t.Errorf("Expected shortcutTab to be 1 after pressing ']', got %d", m.shortcutTab)
+	}
+
+	// 5. Press "[" to switch back to default shortcuts
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "["})
+	m = updatedModel.(model)
+	if m.shortcutTab != 0 {
+		t.Errorf("Expected shortcutTab to be 0 after pressing '[', got %d", m.shortcutTab)
+	}
+
+	// 6. Test help menu open inside shortcut pane
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "`"})
+	m = updatedModel.(model)
+	if !m.helpMenuOpen {
+		t.Errorf("Expected helpMenuOpen to be true inside shortcut pane after pressing '`'")
+	}
+
+	// Close help
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+
+	// 7. Test deleting a bookmark from the Bookmarks tab
+	// Go to tab 1
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "]"})
+	m = updatedModel.(model)
+	// Press "d" to trigger delete bookmark dialog
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "d"})
+	m = updatedModel.(model)
+	if !m.deleteBookmarkConfirmOpen {
+		t.Errorf("Expected deleteBookmarkConfirmOpen to be true after pressing 'd' on bookmarks tab")
+	}
+
+	// Press "y" to confirm removal
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "y"})
+	m = updatedModel.(model)
+	if m.deleteBookmarkConfirmOpen {
+		t.Errorf("Expected deleteBookmarkConfirmOpen to be false after 'y'")
+	}
+	if len(m.bookmarks) != 0 {
+		t.Errorf("Expected bookmarks count to be 0 after deletion, got %d", len(m.bookmarks))
+	}
+}
+
+func TestSwitchActivePaneKeys(t *testing.T) {
+	m := InitialModel()
+	// Default is 1 (File Explorer) and shortcutPaneOpen is true
+	if m.activePane != 1 {
+		t.Errorf("Expected default activePane to be 1, got %d", m.activePane)
+	}
+
+	// Press "3" to switch to Preview pane
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "3"})
+	m = updatedModel.(model)
+	if m.activePane != 2 {
+		t.Errorf("Expected activePane to be 2 after pressing '3', got %d", m.activePane)
+	}
+
+	// Press "1" to switch to Shortcut pane
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "1"})
+	m = updatedModel.(model)
+	if m.activePane != 0 {
+		t.Errorf("Expected activePane to be 0 after pressing '1', got %d", m.activePane)
+	}
+
+	// Press "2" to switch back to File Explorer
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "2"})
+	m = updatedModel.(model)
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to be 1 after pressing '2', got %d", m.activePane)
+	}
+
+	// Close shortcut pane, then try to press "1" (should not switch to 0)
+	m.shortcutPaneOpen = false
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "1"})
+	m = updatedModel.(model)
+	if m.activePane == 0 {
+		t.Errorf("Expected activePane to not switch to 0 when shortcut pane is closed")
 	}
 }
 

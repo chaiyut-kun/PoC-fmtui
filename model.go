@@ -70,6 +70,10 @@ type model struct {
 	shortcutPaneOpen      bool
 	shortcutCursor        int
 	shortcuts             []ShortcutEntry
+	bookmarks             []ShortcutEntry
+	shortcutTab           int // 0 = Default, 1 = Bookmarks
+	bookmarkMenuOpen      bool
+	deleteBookmarkConfirmOpen bool
 }
 
 func (m *model) curTab() *TabState {
@@ -107,16 +111,13 @@ func buildShortcuts() []ShortcutEntry {
 		{Name: "Videos", Path: filepath.Join(home, "Videos"), Icon: "\uf52c"},
 		// {Name: "/", Path: "/", Icon: "\uf013"},
 	}
-	var shortcuts []ShortcutEntry
-	for _, s := range candidates {
-		if info, err := os.Stat(s.Path); err == nil && info.IsDir() {
-			shortcuts = append(shortcuts, s)
+	var existing []ShortcutEntry
+	for _, c := range candidates {
+		if _, err := os.Stat(c.Path); err == nil {
+			existing = append(existing, c)
 		}
 	}
-	if len(shortcuts) == 0 {
-		shortcuts = append(shortcuts, ShortcutEntry{Name: "Home", Path: home, Icon: "🏠"})
-	}
-	return shortcuts
+	return existing
 }
 
 type editorFinishedMsg struct {
@@ -142,10 +143,13 @@ func InitialModel() model {
 	}
 
 	return model{
-		tabs:      []TabState{initialTab},
-		activeTab: 0,
-		selected:  make(map[int]struct{}),
-		shortcuts: buildShortcuts(),
+		tabs:             []TabState{initialTab},
+		activeTab:        0,
+		selected:         make(map[int]struct{}),
+		shortcuts:        buildShortcuts(),
+		bookmarks:        loadBookmarks(),
+		activePane:        1,
+		shortcutPaneOpen: true,
 	}
 }
 
@@ -218,12 +222,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t := m.curTab()
 		switch mEvt.Button {
 		case tea.MouseWheelUp:
-			if m.activePane == 0 {
+			if m.activePane == 0 && m.shortcutPaneOpen {
+				if m.shortcutCursor > 0 {
+					m.shortcutCursor--
+				}
+			} else if m.activePane == 1 {
 				if t.cursor > 0 {
 					t.cursor--
 					m.adjustScroll()
 				}
-			} else {
+			} else if m.activePane == 2 {
 				if t.previewScrollOffset > 0 {
 					t.previewScrollOffset--
 				}
@@ -231,12 +239,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.MouseWheelDown:
-			if m.activePane == 0 {
+			if m.activePane == 0 && m.shortcutPaneOpen {
+				limit := len(m.shortcuts) - 1
+				if m.shortcutTab == 1 {
+					limit = len(m.bookmarks) - 1
+				}
+				if m.shortcutCursor < limit {
+					m.shortcutCursor++
+				}
+			} else if m.activePane == 1 {
 				if t.cursor < len(t.filesPath)-1 {
 					t.cursor++
 					m.adjustScroll()
 				}
-			} else {
+			} else if m.activePane == 2 {
 				t.previewScrollOffset++
 			}
 			return m, nil
@@ -246,17 +262,55 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if width < 20 {
 				width = 80
 			}
-			leftWidth := (width * 2) / 3
-			if mEvt.X < leftWidth {
-				m.activePane = 0
+			shortcutWidth := 0
+			if m.shortcutPaneOpen {
+				shortcutWidth = width / 4
+				if shortcutWidth < 14 {
+					shortcutWidth = 14
+				}
+			}
+			availableWidth := width - shortcutWidth
+			leftWidth := (availableWidth * 2) / 3
+			if leftWidth < 10 {
+				leftWidth = availableWidth / 2
+			}
+
+			if m.shortcutPaneOpen {
+				if mEvt.X < shortcutWidth {
+					m.activePane = 0
+				} else if mEvt.X < shortcutWidth+leftWidth {
+					m.activePane = 1
+				} else {
+					m.activePane = 2
+				}
 			} else {
-				m.activePane = 1
+				if mEvt.X < leftWidth {
+					m.activePane = 1
+				} else {
+					m.activePane = 2
+				}
 			}
 			return m, nil
 		}
 
 	case tea.KeyPressMsg:
 		t := m.curTab()
+		if !m.inputMode && !m.copyMenuOpen && !m.bookmarkMenuOpen && !m.deleteBookmarkConfirmOpen && !m.deleteMenuOpen && !m.permissionMenuOpen && !m.openMenuOpen && !m.helpMenuOpen && !m.metadataInspectorOpen {
+			switch msg.String() {
+			case "1":
+				if m.shortcutPaneOpen {
+					m.activePane = 0
+					return m, nil
+				}
+			case "2":
+				m.activePane = 1
+				return m, nil
+			case "3":
+				m.activePane = 2
+				return m, nil
+			}
+		}
+
 		if m.copyMenuOpen {
 			switch msg.String() {
 			case "p", "P":
@@ -297,6 +351,83 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			default:
 				// Any other key closes the menu (including esc)
 				m.copyMenuOpen = false
+			}
+			return m, nil
+		}
+
+		if m.bookmarkMenuOpen {
+			switch msg.String() {
+			case "s", "S":
+				m.bookmarkMenuOpen = false
+				if len(t.filesPath) > 0 {
+					name := t.filesPath[t.cursor]
+					absPath := findAbsPath(t.currentDir, name)
+					if isDir(t.currentDir, name) {
+						baseName := filepath.Base(absPath)
+						if baseName == "" || baseName == "." || baseName == "/" {
+							baseName = absPath
+						}
+						m.bookmarks = append(m.bookmarks, ShortcutEntry{
+							Name: baseName,
+							Path: absPath,
+							Icon: "📁",
+						})
+						if err := saveBookmarks(m.bookmarks); err != nil {
+							m.err = err
+						} else {
+							m.statusMsg = fmt.Sprintf("Bookmarked directory: %s", baseName)
+						}
+					} else {
+						m.err = fmt.Errorf("selected item is not a directory")
+					}
+				} else {
+					m.err = fmt.Errorf("no item selected")
+				}
+			case "c", "C":
+				m.bookmarkMenuOpen = false
+				absPath := t.currentDir
+				baseName := filepath.Base(absPath)
+				if baseName == "" || baseName == "." || baseName == "/" {
+					baseName = absPath
+				}
+				m.bookmarks = append(m.bookmarks, ShortcutEntry{
+					Name: baseName,
+					Path: absPath,
+					Icon: "📁",
+				})
+				if err := saveBookmarks(m.bookmarks); err != nil {
+					m.err = err
+				} else {
+					m.statusMsg = fmt.Sprintf("Bookmarked current directory: %s", baseName)
+				}
+			default:
+				m.bookmarkMenuOpen = false
+			}
+			return m, nil
+		}
+
+		if m.deleteBookmarkConfirmOpen {
+			switch msg.String() {
+			case "y", "Y":
+				m.deleteBookmarkConfirmOpen = false
+				if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.bookmarks) {
+					removedName := m.bookmarks[m.shortcutCursor].Name
+					m.bookmarks = append(m.bookmarks[:m.shortcutCursor], m.bookmarks[m.shortcutCursor+1:]...)
+					if err := saveBookmarks(m.bookmarks); err != nil {
+						m.err = err
+					} else {
+						m.statusMsg = fmt.Sprintf("Removed bookmark: %s", removedName)
+					}
+					// Clamp cursor
+					if m.shortcutCursor >= len(m.bookmarks) {
+						m.shortcutCursor = len(m.bookmarks) - 1
+					}
+					if m.shortcutCursor < 0 {
+						m.shortcutCursor = 0
+					}
+				}
+			default:
+				m.deleteBookmarkConfirmOpen = false
 			}
 			return m, nil
 		}
@@ -457,7 +588,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Shortcut pane navigation
-		if m.shortcutPaneOpen {
+		if m.shortcutPaneOpen && m.activePane == 0 {
 			switch msg.String() {
 			// ponytail: Allow global exit and exit-with-cd actions while shortcut pane is open
 			case "ctrl+c", "q", "Q":
@@ -468,17 +599,47 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quitting = true
 				_ = writeTempDirFile(t.currentDir)
 				return m, tea.Quit
+			case "`":
+				m.err = nil
+				m.helpMenuOpen = true
+			case "d", "D":
+				if m.shortcutTab == 1 && len(m.bookmarks) > 0 {
+					m.err = nil
+					m.deleteBookmarkConfirmOpen = true
+				}
 			case "up", "k":
 				if m.shortcutCursor > 0 {
 					m.shortcutCursor--
 				}
 			case "down", "j":
-				if m.shortcutCursor < len(m.shortcuts)-1 {
+				limit := len(m.shortcuts) - 1
+				if m.shortcutTab == 1 {
+					limit = len(m.bookmarks) - 1
+				}
+				if m.shortcutCursor < limit {
 					m.shortcutCursor++
 				}
+			case "[":
+				m.shortcutTab = 0
+				m.shortcutCursor = 0
+			case "]":
+				m.shortcutTab = 1
+				m.shortcutCursor = 0
 			case "enter", "right", "l":
-				if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.shortcuts) {
-					targetDir := m.shortcuts[m.shortcutCursor].Path
+				var targetDir string
+				var targetName string
+				if m.shortcutTab == 0 {
+					if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.shortcuts) {
+						targetDir = m.shortcuts[m.shortcutCursor].Path
+						targetName = m.shortcuts[m.shortcutCursor].Name
+					}
+				} else {
+					if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.bookmarks) {
+						targetDir = m.bookmarks[m.shortcutCursor].Path
+						targetName = m.bookmarks[m.shortcutCursor].Name
+					}
+				}
+				if targetDir != "" {
 					entries, err := os.ReadDir(targetDir)
 					if err != nil {
 						m.err = err
@@ -486,7 +647,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.reLoadDir(targetDir, entries)
 						m.adjustScroll()
 						m.shortcutPaneOpen = false
-						m.statusMsg = fmt.Sprintf("Jumped to %s", m.shortcuts[m.shortcutCursor].Name)
+						m.statusMsg = fmt.Sprintf("Jumped to %s", targetName)
 					}
 				}
 			case "esc", "left", "h", "ctrl+b":
@@ -585,6 +746,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Toggle Shortcut Pane
 		case "ctrl+b":
 			m.shortcutPaneOpen = !m.shortcutPaneOpen
+			if !m.shortcutPaneOpen && m.activePane == 0 {
+				m.activePane = 1
+			}
+
+
 
 		case "E", "e":
 			m.quitting = true
@@ -592,10 +758,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		// switch active pane
 		case "tab":
-			if m.activePane == 0 {
-				m.activePane = 1
+			if m.shortcutPaneOpen {
+				m.activePane = (m.activePane + 1) % 3
 			} else {
-				m.activePane = 0
+				if m.activePane == 2 {
+					m.activePane = 1
+				} else {
+					m.activePane = 2
+				}
 			}
 
 		// switch tab previous
@@ -647,7 +817,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			m.err = nil
-			if m.activePane == 0 {
+			if m.activePane == 1 {
 				t.previewScrollOffset = 0
 				if t.cursor > 0 {
 					t.cursor--
@@ -655,7 +825,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					t.cursor = len(t.filesPath) - 1
 				}
 				m.adjustScroll()
-			} else {
+			} else if m.activePane == 2 {
 				if t.previewScrollOffset > 0 {
 					t.previewScrollOffset--
 				}
@@ -665,7 +835,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 			m.err = nil
-			if m.activePane == 0 {
+			if m.activePane == 1 {
 				t.previewScrollOffset = 0
 				if t.cursor < len(t.filesPath)-1 {
 					t.cursor++
@@ -673,7 +843,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					t.cursor = 0
 				}
 				m.adjustScroll()
-			} else {
+			} else if m.activePane == 2 {
 				t.previewScrollOffset++
 			}
 
@@ -905,6 +1075,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.copyMenuOpen = true
 
+		// bookmark menu
+		case "b", "B":
+			m.err = nil
+			m.bookmarkMenuOpen = true
+
 		// delete menu
 		case "d", "D":
 			if len(t.filesPath) == 0 {
@@ -1131,22 +1306,39 @@ func (m model) View() tea.View {
 		}
 	}
 
-	availableWidth := width - shortcutWidth
-	leftWidth := (availableWidth * 2) / 3
-	if leftWidth < 10 {
-		leftWidth = availableWidth / 2
+	var leftWidth, rightWidth int
+	if m.shortcutPaneOpen {
+		leftWidth = width / 2
+		if leftWidth < 10 {
+			leftWidth = 10
+		}
+		rightWidth = width - shortcutWidth - leftWidth
+		if rightWidth < 10 {
+			rightWidth = 10
+		}
+	} else {
+		availableWidth := width - shortcutWidth
+		leftWidth = (availableWidth * 2) / 3
+		if leftWidth < 10 {
+			leftWidth = availableWidth / 2
+		}
+		rightWidth = availableWidth - leftWidth
 	}
-	rightWidth := availableWidth - leftWidth
 
 	leftBorderColor := "#555555"
 	rightBorderColor := "#555555"
 	shortcutBorderColor := "#555555"
 	if m.shortcutPaneOpen {
-		shortcutBorderColor = "#FFFF55"
+		if m.activePane == 0 {
+			shortcutBorderColor = "#5555FF"
+		} else {
+			shortcutBorderColor = "#FFFF55"
+		}
 	}
-	if m.activePane == 0 {
+	if m.activePane == 1 {
 		leftBorderColor = "#5555FF"
-	} else {
+	}
+	if m.activePane == 2 {
 		rightBorderColor = "#5555FF"
 	}
 
@@ -1154,18 +1346,51 @@ func (m model) View() tea.View {
 	var shortcutBox string
 	if m.shortcutPaneOpen {
 		var shortcutText string
-		for i, s := range m.shortcuts {
-			cursor := "  "
-			if i == m.shortcutCursor {
-				cursor = "> "
-			}
-			label := fmt.Sprintf("%s%s  %s%s", cursor, s.Icon, s.Name, Reset)
-			if i == m.shortcutCursor {
-				label = fmt.Sprintf("%s%s%s  %s%s", BgCyan, Black, cursor+s.Icon, s.Name, Reset)
-			}
-			shortcutText += label + "\n"
+		var activeShortcuts []ShortcutEntry
+		if m.shortcutTab == 0 {
+			activeShortcuts = m.shortcuts
+		} else {
+			activeShortcuts = m.bookmarks
 		}
-		shortcutText = strings.TrimSuffix(shortcutText, "\n")
+
+		if len(activeShortcuts) == 0 {
+			shortcutText = " (No bookmarks)\n Press 'b' to add"
+		} else {
+			for i, s := range activeShortcuts {
+				cursor := "  "
+				if i == m.shortcutCursor {
+					cursor = "> "
+				}
+				label := fmt.Sprintf("%s%s  %s%s", cursor, s.Icon, s.Name, Reset)
+				if i == m.shortcutCursor {
+					label = fmt.Sprintf("%s%s%s  %s%s", BgCyan, Black, cursor+s.Icon, s.Name, Reset)
+				}
+				shortcutText += label + "\n"
+			}
+			shortcutText = strings.TrimSuffix(shortcutText, "\n")
+
+			// ponytail: Append full path of active shortcut at the bottom of the pane
+			if m.shortcutCursor >= 0 && m.shortcutCursor < len(activeShortcuts) {
+				selectedPath := activeShortcuts[m.shortcutCursor].Path
+				maxWidth := shortcutWidth - 4
+				if maxWidth < 5 {
+					maxWidth = 5
+				}
+				truncatedPath := truncatePathLeft(selectedPath, maxWidth)
+				sep := strings.Repeat("─", shortcutWidth-2)
+
+				linesCount := strings.Count(shortcutText, "\n") + 1
+				targetHeight := boxHeight - 2
+				paddingNeeded := targetHeight - linesCount - 2 // -2 for sep and path line
+
+				if paddingNeeded > 0 {
+					shortcutText += strings.Repeat("\n", paddingNeeded)
+				} else {
+					shortcutText += "\n"
+				}
+				shortcutText += fmt.Sprintf("%s%s%s\n %s%s%s", Gray, sep, Reset, Yellow, truncatedPath, Reset)
+			}
+		}
 
 		shortcutStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -1175,10 +1400,24 @@ func (m model) View() tea.View {
 
 		shortcutBox = shortcutStyle.Render(shortcutText)
 
-		// Overlay " Shortcuts " title on border
+		// Overlay title on border depending on tab and width
 		scLines := strings.Split(shortcutBox, "\n")
 		if len(scLines) > 0 {
-			scLines[0] = createTopBorder(" Shortcuts ", shortcutWidth, shortcutBorderColor)
+			var title string
+			if shortcutWidth-2 >= 27 {
+				if m.shortcutTab == 0 {
+					title = " [Shortcuts] │ Bookmarks "
+				} else {
+					title = " Shortcuts │ [Bookmarks] "
+				}
+			} else {
+				if m.shortcutTab == 0 {
+					title = " [Shortcuts] "
+				} else {
+					title = " [Bookmarks] "
+				}
+			}
+			scLines[0] = createTopBorder(title, shortcutWidth, shortcutBorderColor, "1")
 			shortcutBox = strings.Join(scLines, "\n")
 		}
 	}
@@ -1214,7 +1453,7 @@ func (m model) View() tea.View {
 			pathTrimmed := " ..." + string(title[len(title)-(maxTitleLen-4):])
 			title = []rune(pathTrimmed)
 		}
-		leftLines[0] = createTopBorder(string(title), leftWidth, leftBorderColor)
+		leftLines[0] = createTopBorder(string(title), leftWidth, leftBorderColor, "2")
 		leftBox = strings.Join(leftLines, "\n")
 	}
 
@@ -1276,7 +1515,7 @@ func (m model) View() tea.View {
 	// Overlay " Preview " on right border
 	rightLines := strings.Split(rightBox, "\n")
 	if len(rightLines) > 0 {
-		rightLines[0] = createTopBorder(" Preview ", rightWidth, rightBorderColor)
+		rightLines[0] = createTopBorder(" Preview ", rightWidth, rightBorderColor, "3")
 		rightBox = strings.Join(rightLines, "\n")
 	}
 
@@ -1316,6 +1555,66 @@ func (m model) View() tea.View {
 			"[s] Copy dir structure (tree)\n\n" +
 			"Press ESC to cancel"
 
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
+	// Render bookmark menu if open
+	if m.bookmarkMenuOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#FF55FF")). // Purple border
+			Padding(1, 2)
+
+		dialogContent := "    Bookmark Options\n\n" +
+			"[s] Bookmark Selected Dir\n" +
+			"[c] Bookmark Current CWD\n\n" +
+			"Press any other key to close"
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 2
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
+	// Render delete bookmark confirmation menu if open
+	if m.deleteBookmarkConfirmOpen {
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#FF5555")). // Red border
+			Padding(1, 2)
+
+		var bookmarkName string
+		if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.bookmarks) {
+			bookmarkName = m.bookmarks[m.shortcutCursor].Name
+		}
+		dialogContent := fmt.Sprintf("   Remove Bookmark?\n\nRemove bookmark for %q?\n\n   [y] Yes      [n] No", bookmarkName)
 		dialog := dialogStyle.Render(dialogContent)
 
 		dialogHeight := lipgloss.Height(dialog)
@@ -1437,9 +1736,11 @@ func (m model) View() tea.View {
 			"  j / k, Up / Down   Navigate files / scroll preview\n" +
 			"  h / l, Left / Right Go to parent dir / enter dir\n" +
 			"  tab                Switch active pane\n" +
-			"  [ / ]              Switch tab prev / next\n" +
+			"  [ / ]              Switch tab prev / next (or switch shortcuts/bookmarks tab in sidebar)\n" +
 			"  t / w              New tab / close tab\n" +
-			"  ctrl+b             Toggle shortcut sidebar pane\n\n" +
+			"  ctrl+b             Toggle shortcut sidebar pane\n" +
+			"  b                  Open bookmark menu (add selected directory / CWD)\n" +
+			"  d                  Remove bookmark (only when inside Bookmarks tab)\n\n" +
 			"File Actions:\n" +
 			"  f / m              Create file / directory\n" +
 			"  a                  Toggle select all / deselect all\n" +

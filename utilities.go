@@ -737,12 +737,23 @@ func getOwnerGroupStr() string {
 	return u
 }
 
-// ponytail: Helper to construct clean top border lines with titles without breaking ANSI escape codes or alignment
-func createTopBorder(title string, width int, color string) string {
+// ponytail: Helper to construct clean top border lines with titles and optional pane numbers without breaking ANSI escape codes or alignment
+func createTopBorder(title string, width int, color string, paneNum string) string {
 	if width < 2 {
 		return ""
 	}
 	barWidth := width - 2
+
+	var prefix string
+	if paneNum != "" {
+		prefix = paneNum + "─"
+	}
+	prefixLen := len([]rune(prefix))
+	if barWidth < prefixLen {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render("╭" + strings.Repeat("─", barWidth) + "╮")
+	}
+
+	barWidth -= prefixLen
 	titleRunes := []rune(title)
 	if len(titleRunes) > barWidth {
 		titleRunes = titleRunes[:barWidth]
@@ -750,6 +761,17 @@ func createTopBorder(title string, width int, color string) string {
 	startIdx := (barWidth - len(titleRunes)) / 2
 	endIdx := barWidth - startIdx - len(titleRunes)
 
-	topStr := "╭" + strings.Repeat("─", startIdx) + string(titleRunes) + strings.Repeat("─", endIdx) + "╮"
+	topStr := "╭" + prefix + strings.Repeat("─", startIdx) + string(titleRunes) + strings.Repeat("─", endIdx) + "╮"
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(topStr)
+}
+
+// ponytail: Helper to truncate paths from the left (showing the most specific subfolders) if they exceed maximum width
+func truncatePathLeft(path string, maxWidth int) string {
+	if len(path) <= maxWidth {
+		return path
+	}
+	if maxWidth <= 3 {
+		return "..."
+	}
+	return "..." + path[len(path)-(maxWidth-3):]
 }
