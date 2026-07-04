@@ -67,6 +67,9 @@ type model struct {
 	undoStack          []ActionRecord
 	redoStack          []ActionRecord
 	metadataInspectorOpen bool
+	shortcutPaneOpen   bool
+	shortcutCursor     int
+	shortcuts          []ShortcutEntry
 }
 
 func (m *model) curTab() *TabState {
@@ -81,6 +84,38 @@ func (m *model) curTab() *TabState {
 		m.activeTab = len(m.tabs) - 1
 	}
 	return &m.tabs[m.activeTab]
+}
+type ShortcutEntry struct {
+	Name string
+	Path string
+	Icon string
+}
+
+func buildShortcuts() []ShortcutEntry {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		home = "/"
+	}
+	candidates := []ShortcutEntry{
+		{Name: "Home", Path: home, Icon: "🏠"},
+		{Name: "Desktop", Path: filepath.Join(home, "Desktop"), Icon: "🖥️"},
+		{Name: "Documents", Path: filepath.Join(home, "Documents"), Icon: "📄"},
+		{Name: "Downloads", Path: filepath.Join(home, "Downloads"), Icon: "⬇️"},
+		{Name: "Music", Path: filepath.Join(home, "Music"), Icon: "🎵"},
+		{Name: "Pictures", Path: filepath.Join(home, "Pictures"), Icon: "🖼️"},
+		{Name: "Videos", Path: filepath.Join(home, "Videos"), Icon: "🎬"},
+		{Name: "/", Path: "/", Icon: "💽"},
+	}
+	var shortcuts []ShortcutEntry
+	for _, s := range candidates {
+		if info, err := os.Stat(s.Path); err == nil && info.IsDir() {
+			shortcuts = append(shortcuts, s)
+		}
+	}
+	if len(shortcuts) == 0 {
+		shortcuts = append(shortcuts, ShortcutEntry{Name: "Home", Path: home, Icon: "🏠"})
+	}
+	return shortcuts
 }
 
 type editorFinishedMsg struct {
@@ -109,6 +144,7 @@ func InitialModel() model {
 		tabs:      []TabState{initialTab},
 		activeTab: 0,
 		selected:  make(map[int]struct{}),
+		shortcuts: buildShortcuts(),
 	}
 }
 
@@ -419,6 +455,36 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		// Shortcut pane navigation
+		if m.shortcutPaneOpen {
+			switch msg.String() {
+			case "up", "k":
+				if m.shortcutCursor > 0 {
+					m.shortcutCursor--
+				}
+			case "down", "j":
+				if m.shortcutCursor < len(m.shortcuts)-1 {
+					m.shortcutCursor++
+				}
+			case "enter", "right", "l":
+				if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.shortcuts) {
+					targetDir := m.shortcuts[m.shortcutCursor].Path
+					entries, err := os.ReadDir(targetDir)
+					if err != nil {
+						m.err = err
+					} else {
+						m.reLoadDir(targetDir, entries)
+						m.adjustScroll()
+						m.shortcutPaneOpen = false
+						m.statusMsg = fmt.Sprintf("Jumped to %s", m.shortcuts[m.shortcutCursor].Name)
+					}
+				}
+			case "esc", "left", "h", "ctrl+b":
+				m.shortcutPaneOpen = false
+			}
+			return m, nil
+		}
+
 		if m.inputMode {
 			switch msg.String() {
 			case "enter":
@@ -505,6 +571,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.stagedOp = ""
 			m.statusMsg = "Cleared all selections"
 			m.err = nil
+
+		// Toggle Shortcut Pane
+		case "ctrl+b":
+			m.shortcutPaneOpen = !m.shortcutPaneOpen
 
 		case "E", "e":
 			m.quitting = true
@@ -1042,18 +1112,71 @@ func (m model) View() tea.View {
 		boxHeight = 3
 	}
 
-	leftWidth := (width * 2) / 3
-	if leftWidth < 10 {
-		leftWidth = width / 2
+	// Calculate shortcut pane width
+	shortcutWidth := 0
+	if m.shortcutPaneOpen {
+		shortcutWidth = width / 4
+		if shortcutWidth < 14 {
+			shortcutWidth = 14
+		}
 	}
-	rightWidth := width - leftWidth
+
+	availableWidth := width - shortcutWidth
+	leftWidth := (availableWidth * 2) / 3
+	if leftWidth < 10 {
+		leftWidth = availableWidth / 2
+	}
+	rightWidth := availableWidth - leftWidth
 
 	leftBorderColor := "#555555"
 	rightBorderColor := "#555555"
+	shortcutBorderColor := "#555555"
+	if m.shortcutPaneOpen {
+		shortcutBorderColor = "#FFFF55"
+	}
 	if m.activePane == 0 {
 		leftBorderColor = "#5555FF"
 	} else {
 		rightBorderColor = "#5555FF"
+	}
+
+	// 0. Create shortcut pane (if open)
+	var shortcutBox string
+	if m.shortcutPaneOpen {
+		var shortcutText string
+		for i, s := range m.shortcuts {
+			cursor := "  "
+			if i == m.shortcutCursor {
+				cursor = "> "
+			}
+			label := fmt.Sprintf("%s%s %s%s", cursor, s.Icon, s.Name, Reset)
+			if i == m.shortcutCursor {
+				label = fmt.Sprintf("%s%s%s %s%s", BgCyan, Black, cursor+s.Icon, s.Name, Reset)
+			}
+			shortcutText += label + "\n"
+		}
+		shortcutText = strings.TrimSuffix(shortcutText, "\n")
+
+		shortcutStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(shortcutBorderColor)).
+			Width(shortcutWidth - 2).
+			Height(boxHeight - 2)
+
+		shortcutBox = shortcutStyle.Render(shortcutText)
+
+		// Overlay " Shortcuts " title on border
+		scLines := strings.Split(shortcutBox, "\n")
+		if len(scLines) > 0 {
+			topLine := []rune(scLines[0])
+			title := []rune(" Shortcuts ")
+			startIdx := (len(topLine) - len(title)) / 2
+			if startIdx > 0 && startIdx+len(title) < len(topLine) {
+				copy(topLine[startIdx:], title)
+				scLines[0] = string(topLine)
+			}
+			shortcutBox = strings.Join(scLines, "\n")
+		}
 	}
 
 	// 1. Create left box (File Explorer)
@@ -1164,8 +1287,13 @@ func (m model) View() tea.View {
 		rightBox = strings.Join(rightLines, "\n")
 	}
 
-	// Join both boxes horizontally
-	content := lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+	// Join all boxes horizontally
+	var content string
+	if m.shortcutPaneOpen {
+		content = lipgloss.JoinHorizontal(lipgloss.Top, shortcutBox, leftBox, rightBox)
+	} else {
+		content = lipgloss.JoinHorizontal(lipgloss.Top, leftBox, rightBox)
+	}
 
 	// Bottom Help & Error Status Bar
 	hiddenStatus := "OFF"
@@ -1317,10 +1445,12 @@ func (m model) View() tea.View {
 			"  h / l, Left / Right Go to parent dir / enter dir\n" +
 			"  tab                Switch active pane\n" +
 			"  [ / ]              Switch tab prev / next\n" +
-			"  t / w              New tab / close tab\n\n" +
+			"  t / w              New tab / close tab\n" +
+			"  ctrl+b             Toggle shortcut sidebar pane\n\n" +
 			"File Actions:\n" +
 			"  f / m              Create file / directory\n" +
 			"  a                  Toggle select all / deselect all\n" +
+			"  i                  File metadata inspector\n" +
 			"  K                  Create symlink for selected item\n" +
 			"  g                  Jump / follow symlink target\n" +
 			"  r                  Rename file or directory\n" +

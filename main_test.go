@@ -822,3 +822,35 @@ func TestMetadataInspectorAction(t *testing.T) {
 	}
 }
 
+func TestShortcutPaneAction(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+
+	// Verify shortcuts were populated
+	if len(m.shortcuts) == 0 {
+		t.Fatalf("Expected shortcuts to be populated, got 0")
+	}
+
+	// 1. Press "ctrl+b" to open shortcut pane
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	m = updatedModel.(model)
+	if !m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be true after pressing 'ctrl+b'")
+	}
+
+	// 2. Press "j" to navigate down in shortcut pane
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "j"})
+	m = updatedModel.(model)
+	if m.shortcutCursor != 1 {
+		t.Errorf("Expected shortcutCursor to be 1 after 'j', got %d", m.shortcutCursor)
+	}
+
+	// 3. Press "esc" to close shortcut pane
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+	if m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be false after pressing 'esc'")
+	}
+}
+
