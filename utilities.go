@@ -143,13 +143,50 @@ func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
 }
 
 func (m *model) reloadCurrentDir() {
-	t := m.curTab()
-	entries, err := os.ReadDir(t.currentDir)
-	if err != nil {
-		m.err = err
-		return
+	m.refreshAllTabs()
+	m.selected = make(map[int]struct{})
+}
+
+func (m *model) refreshAllTabs() {
+	for i := range m.tabs {
+		t := &m.tabs[i]
+		entries, err := os.ReadDir(t.currentDir)
+		if err != nil {
+			continue
+		}
+
+		var oldCursorFile string
+		if t.cursor >= 0 && t.cursor < len(t.filesPath) {
+			oldCursorFile = t.filesPath[t.cursor]
+		}
+
+		t.filesPath = t.filesPath[:0]
+		for _, entry := range entries {
+			if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			t.filesPath = append(t.filesPath, entry.Name())
+		}
+
+		newCursor := t.cursor
+		if oldCursorFile != "" {
+			for idx, f := range t.filesPath {
+				if f == oldCursorFile {
+					newCursor = idx
+					break
+				}
+			}
+			// If not found (e.g. file was deleted or moved), newCursor stays at the same index
+		}
+
+		t.cursor = newCursor
+		if t.cursor >= len(t.filesPath) {
+			t.cursor = len(t.filesPath) - 1
+		}
+		if t.cursor < 0 {
+			t.cursor = 0
+		}
 	}
-	m.reLoadDir(t.currentDir, entries)
 }
 
 func writeTempDirFile(dir string) error {
