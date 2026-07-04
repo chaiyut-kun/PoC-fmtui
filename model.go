@@ -43,33 +43,33 @@ type TabState struct {
 }
 
 type model struct {
-	tabs               []TabState
-	activeTab          int
-	selected           map[int]struct{}
-	showHidden         bool
-	err                error
-	terminalHeight     int
-	terminalWidth      int
-	inputMode          bool
-	inputText          string
-	isCreatingDir      bool
-	isRenaming         bool
-	copyMenuOpen       bool
-	deleteMenuOpen     bool
-	permissionMenuOpen bool
-	openMenuOpen       bool
-	helpMenuOpen       bool
-	activePane         int // 0 = Left (FM), 1 = Right (Preview)
-	stagedPaths        []string
-	stagedOp           string
-	statusMsg          string
-	quitting           bool
-	undoStack          []ActionRecord
-	redoStack          []ActionRecord
+	tabs                  []TabState
+	activeTab             int
+	selected              map[int]struct{}
+	showHidden            bool
+	err                   error
+	terminalHeight        int
+	terminalWidth         int
+	inputMode             bool
+	inputText             string
+	isCreatingDir         bool
+	isRenaming            bool
+	copyMenuOpen          bool
+	deleteMenuOpen        bool
+	permissionMenuOpen    bool
+	openMenuOpen          bool
+	helpMenuOpen          bool
+	activePane            int // 0 = Left (FM), 1 = Right (Preview)
+	stagedPaths           []string
+	stagedOp              string
+	statusMsg             string
+	quitting              bool
+	undoStack             []ActionRecord
+	redoStack             []ActionRecord
 	metadataInspectorOpen bool
-	shortcutPaneOpen   bool
-	shortcutCursor     int
-	shortcuts          []ShortcutEntry
+	shortcutPaneOpen      bool
+	shortcutCursor        int
+	shortcuts             []ShortcutEntry
 }
 
 func (m *model) curTab() *TabState {
@@ -85,6 +85,7 @@ func (m *model) curTab() *TabState {
 	}
 	return &m.tabs[m.activeTab]
 }
+
 type ShortcutEntry struct {
 	Name string
 	Path string
@@ -97,14 +98,14 @@ func buildShortcuts() []ShortcutEntry {
 		home = "/"
 	}
 	candidates := []ShortcutEntry{
-		{Name: "Home", Path: home, Icon: "🏠"},
-		{Name: "Desktop", Path: filepath.Join(home, "Desktop"), Icon: "🖥️"},
-		{Name: "Documents", Path: filepath.Join(home, "Documents"), Icon: "📄"},
-		{Name: "Downloads", Path: filepath.Join(home, "Downloads"), Icon: "⬇️"},
-		{Name: "Music", Path: filepath.Join(home, "Music"), Icon: "🎵"},
-		{Name: "Pictures", Path: filepath.Join(home, "Pictures"), Icon: "🖼️"},
-		{Name: "Videos", Path: filepath.Join(home, "Videos"), Icon: "🎬"},
-		{Name: "/", Path: "/", Icon: "💽"},
+		{Name: "Home", Path: home, Icon: "\uf015"},
+		{Name: "Desktop", Path: filepath.Join(home, "Desktop"), Icon: "\uf108"},
+		{Name: "Documents", Path: filepath.Join(home, "Documents"), Icon: "\ue6ad"},
+		{Name: "Downloads", Path: filepath.Join(home, "Downloads"), Icon: "\uf019"},
+		{Name: "Music", Path: filepath.Join(home, "Music"), Icon: "\uf001"},
+		{Name: "Pictures", Path: filepath.Join(home, "Pictures"), Icon: "\uf03e"},
+		{Name: "Videos", Path: filepath.Join(home, "Videos"), Icon: "\uf52c"},
+		// {Name: "/", Path: "/", Icon: "\uf013"},
 	}
 	var shortcuts []ShortcutEntry
 	for _, s := range candidates {
@@ -1149,9 +1150,9 @@ func (m model) View() tea.View {
 			if i == m.shortcutCursor {
 				cursor = "> "
 			}
-			label := fmt.Sprintf("%s%s %s%s", cursor, s.Icon, s.Name, Reset)
+			label := fmt.Sprintf("%s%s  %s%s", cursor, s.Icon, s.Name, Reset)
 			if i == m.shortcutCursor {
-				label = fmt.Sprintf("%s%s%s %s%s", BgCyan, Black, cursor+s.Icon, s.Name, Reset)
+				label = fmt.Sprintf("%s%s%s  %s%s", BgCyan, Black, cursor+s.Icon, s.Name, Reset)
 			}
 			shortcutText += label + "\n"
 		}
@@ -1168,13 +1169,7 @@ func (m model) View() tea.View {
 		// Overlay " Shortcuts " title on border
 		scLines := strings.Split(shortcutBox, "\n")
 		if len(scLines) > 0 {
-			topLine := []rune(scLines[0])
-			title := []rune(" Shortcuts ")
-			startIdx := (len(topLine) - len(title)) / 2
-			if startIdx > 0 && startIdx+len(title) < len(topLine) {
-				copy(topLine[startIdx:], title)
-				scLines[0] = string(topLine)
-			}
+			scLines[0] = createTopBorder(" Shortcuts ", shortcutWidth, shortcutBorderColor)
 			shortcutBox = strings.Join(scLines, "\n")
 		}
 	}
@@ -1191,7 +1186,6 @@ func (m model) View() tea.View {
 	// Overlay tabs on left border
 	leftLines := strings.Split(leftBox, "\n")
 	if len(leftLines) > 0 {
-		topLine := []rune(leftLines[0])
 		var tabParts []string
 		for i, tb := range m.tabs {
 			dirName := filepath.Base(tb.currentDir)
@@ -1206,16 +1200,12 @@ func (m model) View() tea.View {
 		}
 		rawTitle := " " + strings.Join(tabParts, " | ") + " "
 		title := []rune(rawTitle)
-		maxTitleLen := len(topLine) - 4
+		maxTitleLen := leftWidth - 4
 		if maxTitleLen > 6 && len(title) > maxTitleLen {
 			pathTrimmed := " ..." + string(title[len(title)-(maxTitleLen-4):])
 			title = []rune(pathTrimmed)
 		}
-		startIdx := (len(topLine) - len(title)) / 2
-		if startIdx > 0 && startIdx+len(title) < len(topLine) {
-			copy(topLine[startIdx:], title)
-			leftLines[0] = string(topLine)
-		}
+		leftLines[0] = createTopBorder(string(title), leftWidth, leftBorderColor)
 		leftBox = strings.Join(leftLines, "\n")
 	}
 
@@ -1277,13 +1267,7 @@ func (m model) View() tea.View {
 	// Overlay " Preview " on right border
 	rightLines := strings.Split(rightBox, "\n")
 	if len(rightLines) > 0 {
-		topLine := []rune(rightLines[0])
-		title := []rune(" Preview ")
-		startIdx := (len(topLine) - len(title)) / 2
-		if startIdx > 0 && startIdx+len(title) < len(topLine) {
-			copy(topLine[startIdx:], title)
-			rightLines[0] = string(topLine)
-		}
+		rightLines[0] = createTopBorder(" Preview ", rightWidth, rightBorderColor)
 		rightBox = strings.Join(rightLines, "\n")
 	}
 

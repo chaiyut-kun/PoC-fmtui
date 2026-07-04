@@ -736,3 +736,20 @@ func getOwnerGroupStr() string {
 	}
 	return u
 }
+
+// ponytail: Helper to construct clean top border lines with titles without breaking ANSI escape codes or alignment
+func createTopBorder(title string, width int, color string) string {
+	if width < 2 {
+		return ""
+	}
+	barWidth := width - 2
+	titleRunes := []rune(title)
+	if len(titleRunes) > barWidth {
+		titleRunes = titleRunes[:barWidth]
+	}
+	startIdx := (barWidth - len(titleRunes)) / 2
+	endIdx := barWidth - startIdx - len(titleRunes)
+
+	topStr := "╭" + strings.Repeat("─", startIdx) + string(titleRunes) + strings.Repeat("─", endIdx) + "╮"
+	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(topStr)
+}
