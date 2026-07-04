@@ -459,6 +459,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Shortcut pane navigation
 		if m.shortcutPaneOpen {
 			switch msg.String() {
+			// ponytail: Allow global exit and exit-with-cd actions while shortcut pane is open
+			case "ctrl+c", "q", "Q":
+				_ = clearTempDirFile()
+				m.quitting = true
+				return m, tea.Quit
+			case "E", "e":
+				m.quitting = true
+				_ = writeTempDirFile(t.currentDir)
+				return m, tea.Quit
 			case "up", "k":
 				if m.shortcutCursor > 0 {
 					m.shortcutCursor--
