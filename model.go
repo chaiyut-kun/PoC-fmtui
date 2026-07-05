@@ -647,11 +647,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.reLoadDir(targetDir, entries)
 						m.adjustScroll()
 						m.shortcutPaneOpen = false
+						m.activePane = 1
 						m.statusMsg = fmt.Sprintf("Jumped to %s", targetName)
 					}
 				}
 			case "esc", "left", "h", "ctrl+b":
 				m.shortcutPaneOpen = false
+				m.activePane = 1
 			}
 			return m, nil
 		}

@@ -1017,3 +1017,20 @@ func TestSwitchActivePaneKeys(t *testing.T) {
 	}
 }
 
+func TestShortcutCloseRedirection(t *testing.T) {
+	m := InitialModel()
+	// Open and focus shortcut pane
+	m.shortcutPaneOpen = true
+	m.activePane = 0
+
+	// Pressing esc to close shortcut pane should redirect activePane to 1
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+	if m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be false after esc")
+	}
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to switch to 1 (File Explorer) after closing shortcut pane, got %d", m.activePane)
+	}
+}
+
