@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/atotto/clipboard"
 )
 
 func TestFindAbsPath(t *testing.T) {
@@ -1031,6 +1032,117 @@ func TestShortcutCloseRedirection(t *testing.T) {
 	}
 	if m.activePane != 1 {
 		t.Errorf("Expected activePane to switch to 1 (File Explorer) after closing shortcut pane, got %d", m.activePane)
+	}
+}
+
+func TestAsyncCopyFileContent(t *testing.T) {
+	m := InitialModel()
+	m.activePane = 1
+
+	// 1. Test normal text file copy
+	tempFile, err := os.CreateTemp("", "test_copy_content_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempFile.Name())
+	if _, err := tempFile.WriteString("Hello, Antigravity async copy!"); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tempFile.Close()
+
+	m.curTab().filesPath = []string{filepath.Base(tempFile.Name())}
+	m.curTab().currentDir = filepath.Dir(tempFile.Name())
+	m.curTab().cursor = 0
+
+	// Open copy menu
+	updatedModel, cmd := m.Update(tea.KeyPressMsg{Text: "y"})
+	m = updatedModel.(model)
+	if !m.copyMenuOpen {
+		t.Fatalf("Expected copy menu to be open")
+	}
+
+	// Choose copy content
+	updatedModel, cmd = m.Update(tea.KeyPressMsg{Text: "c"})
+	m = updatedModel.(model)
+	if m.copyMenuOpen {
+		t.Errorf("Expected copy menu to close after selection")
+	}
+	if !m.copyJobActive {
+		t.Fatalf("Expected copyJobActive to be true")
+	}
+	if cmd == nil {
+		t.Fatalf("Expected tea.Cmd to be returned for async copy")
+	}
+
+	// Run the returned cmd(s) to completion
+	for m.copyJobActive {
+		msg := cmd()
+		if msg == nil {
+			break
+		}
+		updatedModel, cmd = m.Update(msg)
+		m = updatedModel.(model)
+	}
+
+	if m.err != nil {
+		t.Errorf("Expected no copy error, got %v", m.err)
+	}
+
+	clipText, err := clipboard.ReadAll()
+	if err == nil {
+		if clipText != "Hello, Antigravity async copy!" {
+			t.Errorf("Expected clipboard content to be %q, got %q", "Hello, Antigravity async copy!", clipText)
+		}
+	}
+
+	// 2. Test binary file warning
+	tempBin, err := os.CreateTemp("", "test_copy_bin_*.txt")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tempBin.Name())
+	if _, err := tempBin.Write([]byte{0x00, 0x01, 0x02}); err != nil {
+		t.Fatalf("Failed to write to temp file: %v", err)
+	}
+	tempBin.Close()
+
+	m.curTab().filesPath = []string{filepath.Base(tempBin.Name())}
+	m.curTab().cursor = 0
+
+	// Open copy menu
+	updatedModel, cmd = m.Update(tea.KeyPressMsg{Text: "y"})
+	m = updatedModel.(model)
+	// Choose copy content
+	updatedModel, cmd = m.Update(tea.KeyPressMsg{Text: "c"})
+	m = updatedModel.(model)
+
+	// Run to completion
+	for m.copyJobActive {
+		msg := cmd()
+		if msg == nil {
+			break
+		}
+		updatedModel, cmd = m.Update(msg)
+		m = updatedModel.(model)
+	}
+
+	if m.err == nil {
+		t.Errorf("Expected binary copy file content operation to fail")
+	} else if !strings.Contains(m.err.Error(), "binary") {
+		t.Errorf("Expected binary file warning, got error %v", m.err)
+	}
+
+	// 3. Test cancellation
+	m.err = nil
+	m.copyJobActive = true
+	m.copyJobCancel = make(chan struct{})
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
+	m = updatedModel.(model)
+	if m.copyJobActive {
+		t.Errorf("Expected copyJobActive to be false after pressing esc")
+	}
+	if !strings.Contains(m.statusMsg, "cancelled") {
+		t.Errorf("Expected status message to contain 'cancelled', got %q", m.statusMsg)
 	}
 }
 

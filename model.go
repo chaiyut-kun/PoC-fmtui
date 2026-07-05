@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,14 @@ import (
 )
 
 type subshellFinishedMsg struct{ err error }
+
+type copyProgressMsg struct {
+	progress float64
+}
+
+type copyFinishedMsg struct {
+	err error
+}
 
 type ActionType string
 
@@ -74,6 +83,11 @@ type model struct {
 	shortcutTab           int // 0 = Default, 1 = Bookmarks
 	bookmarkMenuOpen      bool
 	deleteBookmarkConfirmOpen bool
+	copyJobActive             bool
+	copyJobProgress           float64
+	copyJobFileName           string
+	copyProgressChan          chan tea.Msg
+	copyJobCancel             chan struct{}
 }
 
 func (m *model) curTab() *TabState {
@@ -88,6 +102,109 @@ func (m *model) curTab() *TabState {
 		m.activeTab = len(m.tabs) - 1
 	}
 	return &m.tabs[m.activeTab]
+}
+
+func (m *model) startCopyContentJob(filePath string, fileName string) tea.Cmd {
+	m.copyJobActive = true
+	m.copyJobProgress = 0.0
+	m.copyJobFileName = fileName
+	m.copyProgressChan = make(chan tea.Msg, 100)
+	m.copyJobCancel = make(chan struct{})
+
+	go func(path string, ch chan tea.Msg, cancel chan struct{}) {
+		file, err := os.Open(path)
+		if err != nil {
+			ch <- copyFinishedMsg{err: err}
+			return
+		}
+		defer file.Close()
+
+		info, err := file.Stat()
+		if err != nil {
+			ch <- copyFinishedMsg{err: err}
+			return
+		}
+		totalSize := info.Size()
+
+		// Limit file size to 50MB
+		if totalSize > 50*1024*1024 {
+			ch <- copyFinishedMsg{err: fmt.Errorf("file too large to copy content (max 50MB)")}
+			return
+		}
+
+		// Read in chunks
+		chunkSize := int64(64 * 1024) // 64KB chunks
+		buffer := make([]byte, chunkSize)
+		var totalRead int64
+		var contentBuilder strings.Builder
+		contentBuilder.Grow(int(totalSize))
+
+		isBinaryChecked := false
+
+		for {
+			select {
+			case <-cancel:
+				ch <- copyFinishedMsg{err: fmt.Errorf("copy cancelled")}
+				return
+			default:
+			}
+
+			n, err := file.Read(buffer)
+			if n > 0 {
+				chunk := buffer[:n]
+				// Binary detection check on first read
+				if !isBinaryChecked {
+					isBinaryChecked = true
+					checkLen := n
+					if checkLen > 1024 {
+						checkLen = 1024
+					}
+					for i := 0; i < checkLen; i++ {
+						if chunk[i] == 0x00 {
+							ch <- copyFinishedMsg{err: fmt.Errorf("cannot copy content: file is binary")}
+							return
+						}
+					}
+				}
+
+				contentBuilder.Write(chunk)
+				totalRead += int64(n)
+
+				if totalSize > 0 {
+					progress := float64(totalRead) / float64(totalSize)
+					ch <- copyProgressMsg{progress: progress}
+				}
+			}
+
+			if err != nil {
+				if err == io.EOF {
+					break
+				}
+				ch <- copyFinishedMsg{err: err}
+				return
+			}
+		}
+
+		// Copy to clipboard
+		if err := copyToClipboard(contentBuilder.String()); err != nil {
+			ch <- copyFinishedMsg{err: err}
+			return
+		}
+
+		ch <- copyFinishedMsg{err: nil}
+	}(filePath, m.copyProgressChan, m.copyJobCancel)
+
+	return m.listenCopyProgress()
+}
+
+func (m *model) listenCopyProgress() tea.Cmd {
+	return func() tea.Msg {
+		msg, ok := <-m.copyProgressChan
+		if !ok {
+			return nil
+		}
+		return msg
+	}
 }
 
 type ShortcutEntry struct {
@@ -211,6 +328,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case copyProgressMsg:
+		m.copyJobProgress = msg.progress
+		return m, m.listenCopyProgress()
+
+	case copyFinishedMsg:
+		m.copyJobActive = false
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.statusMsg = fmt.Sprintf("Copied %s content to clipboard", m.copyJobFileName)
+		}
+		return m, nil
+
 	case tea.WindowSizeMsg:
 		m.terminalHeight = msg.Height
 		m.terminalWidth = msg.Width
@@ -295,6 +425,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyPressMsg:
 		t := m.curTab()
+		if m.copyJobActive {
+			if msg.String() == "esc" {
+				if m.copyJobCancel != nil {
+					close(m.copyJobCancel)
+				}
+				m.copyJobActive = false
+				m.statusMsg = "Copy cancelled"
+			}
+			return m, nil
+		}
 		if !m.inputMode && !m.copyMenuOpen && !m.bookmarkMenuOpen && !m.deleteBookmarkConfirmOpen && !m.deleteMenuOpen && !m.permissionMenuOpen && !m.openMenuOpen && !m.helpMenuOpen && !m.metadataInspectorOpen {
 			switch msg.String() {
 			case "1":
@@ -347,6 +487,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.err = err
 				} else {
 					m.statusMsg = "Copied CWD directory structure to clipboard"
+				}
+			case "c", "C":
+				m.copyMenuOpen = false
+				if len(t.filesPath) > 0 {
+					name := t.filesPath[t.cursor]
+					absPath := findAbsPath(t.currentDir, name)
+					if isDir(t.currentDir, name) {
+						m.err = fmt.Errorf("cannot copy content: %s is a directory", name)
+						break
+					}
+					return m, m.startCopyContentJob(absPath, name)
 				}
 			default:
 				// Any other key closes the menu (including esc)
@@ -1217,6 +1368,9 @@ func (m model) View() tea.View {
 	if m.err != nil || m.inputMode {
 		overhead = 9
 	}
+	if m.copyJobActive {
+		overhead += 4
+	}
 	maxVisible := m.terminalHeight - overhead
 	if maxVisible < 1 {
 		maxVisible = 1
@@ -1425,11 +1579,18 @@ func (m model) View() tea.View {
 	}
 
 	// 1. Create left box (File Explorer)
+	leftHeight := boxHeight - 2
+	if m.copyJobActive {
+		leftHeight -= 4
+		if leftHeight < 3 {
+			leftHeight = 3
+		}
+	}
 	leftStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
 		Width(leftWidth - 2).
-		Height(boxHeight - 2)
+		Height(leftHeight)
 
 	leftBox := leftStyle.Render(renderedText)
 
@@ -1457,6 +1618,37 @@ func (m model) View() tea.View {
 		}
 		leftLines[0] = createTopBorder(string(title), leftWidth, leftBorderColor, "2")
 		leftBox = strings.Join(leftLines, "\n")
+	}
+
+	if m.copyJobActive {
+		progressWidth := leftWidth
+		if progressWidth < 14 {
+			progressWidth = 14
+		}
+
+		barWidth := progressWidth - 25 // subtract space for borders and labels
+		if barWidth < 5 {
+			barWidth = 5
+		}
+		filledLen := int(m.copyJobProgress * float64(barWidth))
+		if filledLen > barWidth {
+			filledLen = barWidth
+		}
+		emptyLen := barWidth - filledLen
+		barStr := strings.Repeat("█", filledLen) + strings.Repeat("░", emptyLen)
+
+		percentStr := fmt.Sprintf("%.1f%%", m.copyJobProgress*100)
+		progressContent := fmt.Sprintf("Copying: %s\n[%s] %s (Esc to cancel)", m.copyJobFileName, barStr, percentStr)
+
+		progressStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("#55FFFF")). // Cyan border
+			Padding(0, 1).
+			Width(progressWidth - 2).
+			Height(2) // 4 lines total including borders
+
+		progressPane := progressStyle.Render(progressContent)
+		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, progressPane)
 	}
 
 	// 2. Create right box (Previewer)
@@ -1554,7 +1746,8 @@ func (m model) View() tea.View {
 			"[p] Copy absolute path\n" +
 			"[n] Copy name only\n" +
 			"[e] Copy name with ext\n" +
-			"[s] Copy dir structure (tree)\n\n" +
+			"[s] Copy dir structure (tree)\n" +
+			"[c] Copy file content\n\n" +
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
