@@ -1,7 +1,7 @@
 # Instruction
 - files or dir to create for plan, diagram or anything just make to this project only not anywhere else
 @ .gemini/
-
+- always build app as name "fm" 
 # Goals
 create proof of concept "file manger tui apps" 
 

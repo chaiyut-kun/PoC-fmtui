@@ -61,6 +61,7 @@ type model struct {
 	terminalWidth         int
 	inputMode             bool
 	inputText             string
+	inputCursor           int // rune index into inputText; ponytail: single int, no textarea widget
 	isCreatingDir         bool
 	isRenaming            bool
 	copyMenuOpen          bool
@@ -281,9 +282,9 @@ func (m *model) adjustScroll() {
 		return
 	}
 
-	overhead := 4
+	overhead := 3
 	if m.err != nil || m.inputMode {
-		overhead = 5
+		overhead = 4
 	}
 	maxVisible := m.terminalHeight - overhead
 	if maxVisible < 1 {
@@ -813,6 +814,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "enter":
 				m.inputMode = false
+				m.inputCursor = 0
 				if m.inputText == "" {
 					m.isRenaming = false
 					break
@@ -870,15 +872,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "esc":
 				m.inputMode = false
 				m.inputText = ""
+				m.inputCursor = 0
 				m.isRenaming = false
+			case "left":
+				if m.inputCursor > 0 {
+					m.inputCursor--
+				}
+			case "right":
+				if m.inputCursor < len([]rune(m.inputText)) {
+					m.inputCursor++
+				}
+			case "home":
+				m.inputCursor = 0
+			case "end":
+				m.inputCursor = len([]rune(m.inputText))
 			case "backspace":
-				if len(m.inputText) > 0 {
-					m.inputText = m.inputText[:len(m.inputText)-1]
+				runes := []rune(m.inputText)
+				if m.inputCursor > 0 {
+					runes = append(runes[:m.inputCursor-1], runes[m.inputCursor:]...)
+					m.inputText = string(runes)
+					m.inputCursor--
 				}
 			default:
-				runes := []rune(msg.String())
-				if len(runes) == 1 {
-					m.inputText += string(runes)
+				r := []rune(msg.String())
+				if len(r) == 1 {
+					runes := []rune(m.inputText)
+					runes = append(runes[:m.inputCursor], append([]rune{r[0]}, runes[m.inputCursor:]...)...)
+					m.inputText = string(runes)
+					m.inputCursor++
 				}
 			}
 			return m, nil
@@ -1036,6 +1057,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.inputMode = true
 			m.isRenaming = true
 			m.inputText = t.filesPath[t.cursor]
+			// ponytail: cursor before ".ext"; dirs and dotfiles go to end
+			name := t.filesPath[t.cursor]
+			m.inputCursor = len([]rune(name)) // default: end
+			if !isDir(t.currentDir, name) {
+				if dot := strings.LastIndex(name, "."); dot > 0 {
+					m.inputCursor = len([]rune(name[:dot]))
+				}
+			}
 
 		// Undo
 		case "u":
@@ -1364,9 +1393,9 @@ func (m model) View() tea.View {
 	t := m.curTab()
 	renderedText := fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset)
 
-	overhead := 8
+	overhead := 7
 	if m.err != nil || m.inputMode {
-		overhead = 9
+		overhead = 8
 	}
 	if m.copyJobActive {
 		overhead += 4
@@ -1415,12 +1444,7 @@ func (m model) View() tea.View {
 		}
 	}
 
-	// Option A: Append metadata summary bar at bottom of File Explorer pane
-	if len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
-		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
-		metaBar := fmt.Sprintf("\n%s─%s %s%s | %s | %s | %s%s", Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
-		renderedText += metaBar
-	}
+
 
 	if m.inputMode {
 		prompt := "Create file"
@@ -1429,7 +1453,15 @@ func (m model) View() tea.View {
 		} else if m.isCreatingDir {
 			prompt = "Create directory"
 		}
-		renderedText += fmt.Sprintf("\n%s: %s█\n(Enter to confirm, Esc to cancel)", prompt, m.inputText)
+		// ponytail: split at cursor rune index, no extra lib
+		runes := []rune(m.inputText)
+		cur := m.inputCursor
+		if cur > len(runes) {
+			cur = len(runes)
+		}
+		before := string(runes[:cur])
+		after := string(runes[cur:])
+		renderedText += fmt.Sprintf("\n%s: %s█%s\n(Enter to confirm, Esc to cancel)", prompt, before, after)
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
@@ -1579,7 +1611,7 @@ func (m model) View() tea.View {
 	}
 
 	// 1. Create left box (File Explorer)
-	leftHeight := boxHeight - 2
+	leftHeight := boxHeight - 3
 	if m.copyJobActive {
 		leftHeight -= 4
 		if leftHeight < 3 {
@@ -1649,6 +1681,16 @@ func (m model) View() tea.View {
 
 		progressPane := progressStyle.Render(progressContent)
 		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, progressPane)
+	}
+
+	// ponytail: plain string join, no new type or style struct
+	if len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
+		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
+		metaLine := fmt.Sprintf(" %s─%s %s%s | %s | %s | %s%s",
+			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
+		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, metaLine)
+	} else {
+		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, "")
 	}
 
 	// 2. Create right box (Previewer)

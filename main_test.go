@@ -1145,4 +1145,157 @@ func TestAsyncCopyFileContent(t *testing.T) {
 		t.Errorf("Expected status message to contain 'cancelled', got %q", m.statusMsg)
 	}
 }
+func TestRenameCursor(t *testing.T) {
+	// helpers
+	press := func(m model, key string) model {
+		updated, _ := m.Update(tea.KeyPressMsg{Text: key})
+		return updated.(model)
+	}
 
+	// Setup: temp dir with a real file so isDir() works correctly
+	tmp := t.TempDir()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(os.WriteFile(filepath.Join(tmp, "hello.txt"), nil, 0644))
+	must(os.WriteFile(filepath.Join(tmp, ".bashrc"), nil, 0644))
+	must(os.Mkdir(filepath.Join(tmp, "mydir"), 0755))
+	must(os.WriteFile(filepath.Join(tmp, "noext"), nil, 0644))
+
+	newModel := func(name string) model {
+		m := InitialModel()
+		m.tabs[0].currentDir = tmp
+		m.tabs[0].filesPath = []string{name}
+		m.tabs[0].cursor = 0
+		return m
+	}
+
+	t.Run("cursor before ext on file", func(t *testing.T) {
+		m := newModel("hello.txt")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		// "hello" is 5 runes → cursor at 5
+		if m.inputCursor != 5 {
+			t.Errorf("expected inputCursor=5, got %d", m.inputCursor)
+		}
+		if !m.inputMode || !m.isRenaming {
+			t.Fatal("expected inputMode and isRenaming")
+		}
+	})
+
+	t.Run("cursor at end for dotfile", func(t *testing.T) {
+		m := newModel(".bashrc")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		want := len([]rune(".bashrc")) // 7
+		if m.inputCursor != want {
+			t.Errorf("expected inputCursor=%d, got %d", want, m.inputCursor)
+		}
+	})
+
+	t.Run("cursor at end for dir", func(t *testing.T) {
+		m := newModel("mydir")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		want := len([]rune("mydir")) // 5
+		if m.inputCursor != want {
+			t.Errorf("expected inputCursor=%d, got %d", want, m.inputCursor)
+		}
+	})
+
+	t.Run("cursor at end for no-ext file", func(t *testing.T) {
+		m := newModel("noext")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		want := len([]rune("noext")) // 5
+		if m.inputCursor != want {
+			t.Errorf("expected inputCursor=%d, got %d", want, m.inputCursor)
+		}
+	})
+
+	t.Run("left/right/home/end navigation", func(t *testing.T) {
+		m := newModel("hello.txt")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		// cursor starts at 5
+		m = press(m, "left")
+		if m.inputCursor != 4 {
+			t.Errorf("after left: expected 4, got %d", m.inputCursor)
+		}
+		m = press(m, "right")
+		if m.inputCursor != 5 {
+			t.Errorf("after right: expected 5, got %d", m.inputCursor)
+		}
+		m = press(m, "home")
+		if m.inputCursor != 0 {
+			t.Errorf("after home: expected 0, got %d", m.inputCursor)
+		}
+		m = press(m, "end")
+		if m.inputCursor != len([]rune("hello.txt")) {
+			t.Errorf("after end: expected %d, got %d", len([]rune("hello.txt")), m.inputCursor)
+		}
+		// clamp: left at 0 stays 0
+		m = press(m, "home")
+		m = press(m, "left")
+		if m.inputCursor != 0 {
+			t.Errorf("left clamp: expected 0, got %d", m.inputCursor)
+		}
+	})
+
+	t.Run("insert at cursor", func(t *testing.T) {
+		m := newModel("hello.txt")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		// cursor=5, type "X" → "helloX.txt"
+		m = press(m, "X")
+		if m.inputText != "helloX.txt" {
+			t.Errorf("expected helloX.txt, got %q", m.inputText)
+		}
+		if m.inputCursor != 6 {
+			t.Errorf("expected cursor=6, got %d", m.inputCursor)
+		}
+	})
+
+	t.Run("backspace at cursor", func(t *testing.T) {
+		m := newModel("hello.txt")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		// cursor=5, backspace → deletes 'o' → "hell.txt"
+		m = press(m, "backspace")
+		if m.inputText != "hell.txt" {
+			t.Errorf("expected hell.txt, got %q", m.inputText)
+		}
+		if m.inputCursor != 4 {
+			t.Errorf("expected cursor=4, got %d", m.inputCursor)
+		}
+	})
+
+	t.Run("esc resets cursor", func(t *testing.T) {
+		m := newModel("hello.txt")
+		m, _ = func() (model, tea.Cmd) {
+			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
+			return u.(model), c
+		}()
+		m = press(m, "esc")
+		if m.inputMode || m.inputCursor != 0 || m.inputText != "" {
+			t.Errorf("esc should reset inputMode, inputCursor, inputText")
+		}
+	})
+}
