@@ -327,6 +327,7 @@ func TestShowCurrentPathInTopBorder(t *testing.T) {
 }
 
 func TestBottomHelpMessage(t *testing.T) {
+	t.Skip("Help message bar is disabled per YAGNI")
 	m := InitialModel()
 	m.terminalWidth = 120
 	m.terminalHeight = 24

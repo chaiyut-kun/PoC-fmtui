@@ -52,37 +52,37 @@ type TabState struct {
 }
 
 type model struct {
-	tabs                  []TabState
-	activeTab             int
-	selected              map[int]struct{}
-	showHidden            bool
-	err                   error
-	terminalHeight        int
-	terminalWidth         int
-	inputMode             bool
-	inputText             string
-	inputCursor           int // rune index into inputText; ponytail: single int, no textarea widget
-	isCreatingDir         bool
-	isRenaming            bool
-	copyMenuOpen          bool
-	deleteMenuOpen        bool
-	permissionMenuOpen    bool
-	openMenuOpen          bool
-	helpMenuOpen          bool
-	activePane            int // 0 = Left (FM), 1 = Right (Preview)
-	stagedPaths           []string
-	stagedOp              string
-	statusMsg             string
-	quitting              bool
-	undoStack             []ActionRecord
-	redoStack             []ActionRecord
-	metadataInspectorOpen bool
-	shortcutPaneOpen      bool
-	shortcutCursor        int
-	shortcuts             []ShortcutEntry
-	bookmarks             []ShortcutEntry
-	shortcutTab           int // 0 = Default, 1 = Bookmarks
-	bookmarkMenuOpen      bool
+	tabs                      []TabState
+	activeTab                 int
+	selected                  map[int]struct{}
+	showHidden                bool
+	err                       error
+	terminalHeight            int
+	terminalWidth             int
+	inputMode                 bool
+	inputText                 string
+	inputCursor               int // rune index into inputText; ponytail: single int, no textarea widget
+	isCreatingDir             bool
+	isRenaming                bool
+	copyMenuOpen              bool
+	deleteMenuOpen            bool
+	permissionMenuOpen        bool
+	openMenuOpen              bool
+	helpMenuOpen              bool
+	activePane                int // 0 = Left (FM), 1 = Right (Preview)
+	stagedPaths               []string
+	stagedOp                  string
+	statusMsg                 string
+	quitting                  bool
+	undoStack                 []ActionRecord
+	redoStack                 []ActionRecord
+	metadataInspectorOpen     bool
+	shortcutPaneOpen          bool
+	shortcutCursor            int
+	shortcuts                 []ShortcutEntry
+	bookmarks                 []ShortcutEntry
+	shortcutTab               int // 0 = Default, 1 = Bookmarks
+	bookmarkMenuOpen          bool
 	deleteBookmarkConfirmOpen bool
 	copyJobActive             bool
 	copyJobProgress           float64
@@ -266,13 +266,47 @@ func InitialModel() model {
 		selected:         make(map[int]struct{}),
 		shortcuts:        buildShortcuts(),
 		bookmarks:        loadBookmarks(),
-		activePane:        1,
+		activePane:       1,
 		shortcutPaneOpen: true,
 	}
 }
 
 func (m model) Init() tea.Cmd {
 	return nil
+}
+
+// getMaxVisibleFiles returns the exact number of file rows that fit inside
+// the File Explorer pane. Both adjustScroll and View must use this value so
+// they always agree on the scroll window. // ponytail: single source of truth
+func (m *model) getMaxVisibleFiles() int {
+	bottomBarLines := 1
+	if m.err != nil {
+		bottomBarLines = 2
+	}
+	boxHeight := m.terminalHeight - bottomBarLines
+	if boxHeight < 3 {
+		boxHeight = 3
+	}
+	leftHeight := boxHeight - 2 // subtract top+bottom border
+	if m.copyJobActive {
+		leftHeight -= 4 // progress pane height
+		if leftHeight < 3 {
+			leftHeight = 3
+		}
+	}
+	// rows consumed inside the box beyond the file list:
+	//   1 = path header line
+	//   1 = metadata bar at bottom
+	//   2 = input prompt lines (only in inputMode)
+	consumed := 2
+	if m.inputMode {
+		consumed += 2
+	}
+	maxVisible := leftHeight - consumed
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+	return maxVisible
 }
 
 func (m *model) adjustScroll() {
@@ -282,14 +316,7 @@ func (m *model) adjustScroll() {
 		return
 	}
 
-	overhead := 3
-	if m.err != nil || m.inputMode {
-		overhead = 4
-	}
-	maxVisible := m.terminalHeight - overhead
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
+	maxVisible := m.getMaxVisibleFiles()
 
 	if t.scrollOffset < 0 {
 		t.scrollOffset = 0
@@ -924,8 +951,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.activePane = 1
 			}
 
-
-
 		case "E", "e":
 			m.quitting = true
 			_ = writeTempDirFile(t.currentDir)
@@ -1393,17 +1418,7 @@ func (m model) View() tea.View {
 	t := m.curTab()
 	renderedText := fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset)
 
-	overhead := 7
-	if m.err != nil || m.inputMode {
-		overhead = 8
-	}
-	if m.copyJobActive {
-		overhead += 4
-	}
-	maxVisible := m.terminalHeight - overhead
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
+	maxVisible := m.getMaxVisibleFiles()
 
 	endIdx := t.scrollOffset + maxVisible
 	if endIdx > len(t.filesPath) {
@@ -1444,7 +1459,19 @@ func (m model) View() tea.View {
 		}
 	}
 
+	// Dynamic padding: push metadata to bottom of the box interior
+	numRendered := endIdx - t.scrollOffset
+	paddingLines := maxVisible - numRendered
+	if paddingLines > 0 {
+		renderedText += strings.Repeat("\n", paddingLines)
+	}
 
+	// Metadata bar pinned at bottom inside the border
+	if len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
+		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
+		renderedText += fmt.Sprintf("%s─%s %s%s | %s | %s | %s%s\n",
+			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
+	}
 
 	if m.inputMode {
 		prompt := "Create file"
@@ -1461,7 +1488,7 @@ func (m model) View() tea.View {
 		}
 		before := string(runes[:cur])
 		after := string(runes[cur:])
-		renderedText += fmt.Sprintf("\n%s: %s█%s\n(Enter to confirm, Esc to cancel)", prompt, before, after)
+		renderedText += fmt.Sprintf("%s: %s█%s\n(Enter to confirm, Esc to cancel)\n", prompt, before, after)
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
@@ -1611,7 +1638,7 @@ func (m model) View() tea.View {
 	}
 
 	// 1. Create left box (File Explorer)
-	leftHeight := boxHeight - 3
+	leftHeight := boxHeight - 2
 	if m.copyJobActive {
 		leftHeight -= 4
 		if leftHeight < 3 {
@@ -1681,16 +1708,6 @@ func (m model) View() tea.View {
 
 		progressPane := progressStyle.Render(progressContent)
 		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, progressPane)
-	}
-
-	// ponytail: plain string join, no new type or style struct
-	if len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
-		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
-		metaLine := fmt.Sprintf(" %s─%s %s%s | %s | %s | %s%s",
-			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
-		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, metaLine)
-	} else {
-		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, "")
 	}
 
 	// 2. Create right box (Previewer)
@@ -1764,19 +1781,19 @@ func (m model) View() tea.View {
 	}
 
 	// Bottom Help & Error Status Bar
-	hiddenStatus := "OFF"
+	// hiddenStatus := "OFF"
 	if m.showHidden {
-		hiddenStatus = "ON"
+		// hiddenStatus = "ON"
 	}
-	helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'a' all | 'c' copy | 'm' move | 'v'/'p' paste | 'g' jump link | 'K' mklink | 'e' exit&cd | '.' hidden:%s | '`' help", hiddenStatus)
+	// helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'a' all | 'c' copy | 'm' move | 'v'/'p' paste | 'g' jump link | 'K' mklink | 'e' exit&cd | '.' hidden:%s | '`' help", hiddenStatus)
 
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
 	} else if m.statusMsg != "" {
 		content += fmt.Sprintf("\n%s%s%s", Green, m.statusMsg, Reset)
 	}
-	content += "\n" + helpText
-
+	// content += "\n" + helpText
+	content += "\n"
 	// Render copy menu if open
 	if m.copyMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
