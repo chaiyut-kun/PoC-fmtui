@@ -2,7 +2,7 @@ opc:
 	@./opencode.sh
 
 bd:
-	@./build.sh
+	@./scripts/build.sh
 
 dev:
 	@go run ./cmd/fm
