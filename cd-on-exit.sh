@@ -1,6 +1,6 @@
 fm() {
     local tmp="${TMPDIR:-/tmp}/fmtui-dir"
-    fmtui "$@"
+    command fm "$@"
     if [ -f "$tmp" ]; then
         local dir
         dir=$(cat "$tmp")

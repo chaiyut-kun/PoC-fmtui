@@ -1,3 +1,3 @@
-go build -o fmtui
+go build -o fm ./cmd/fm
 
-mv fmtui $(go env GOPATH)/bin
+mv fm $(go env GOPATH)/bin

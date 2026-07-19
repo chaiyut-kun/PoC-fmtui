@@ -5,10 +5,11 @@ import (
 	"os"
 
 	tea "charm.land/bubbletea/v2"
+	"file-list/internal/tui"
 )
 
 func main() {
-	program := tea.NewProgram(InitialModel())
+	program := tea.NewProgram(tui.InitialModel())
 	m, err := program.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)

@@ -1,4 +1,4 @@
-package main
+package tui
 
 const (
 	Reset         = "\033[0m"

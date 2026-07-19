@@ -5,6 +5,6 @@ bd:
 	@./build.sh
 
 dev:
-	@go run .
+	@go run ./cmd/fm
 agy:
 	@./agy.sh
