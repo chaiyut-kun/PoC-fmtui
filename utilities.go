@@ -129,6 +129,10 @@ func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
 	t := m.curTab()
 	t.currentDir = changeDir
 	t.filesPath = t.filesPath[:0]
+	t.filteredFiles = nil
+	m.searchActive = false
+	m.searchText = ""
+	m.searchCursor = 0
 	for _, entry := range entries {
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
@@ -161,6 +165,10 @@ func (m *model) refreshAllTabs() {
 		}
 
 		t.filesPath = t.filesPath[:0]
+	t.filteredFiles = nil
+	m.searchActive = false
+	m.searchText = ""
+	m.searchCursor = 0
 		for _, entry := range entries {
 			if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 				continue
@@ -774,4 +782,23 @@ func truncatePathLeft(path string, maxWidth int) string {
 		return "..."
 	}
 	return "..." + path[len(path)-(maxWidth-3):]
+}
+
+
+func (m *model) applySearchFilter() {
+	t := m.curTab()
+	if m.searchText == "" {
+		t.filteredFiles = nil
+	} else {
+		query := strings.ToLower(m.searchText)
+		t.filteredFiles = make([]string, 0)
+		for _, name := range t.filesPath {
+			if strings.Contains(strings.ToLower(name), query) {
+				t.filteredFiles = append(t.filteredFiles, name)
+			}
+		}
+	}
+	t.cursor = 0
+	t.scrollOffset = 0
+	m.adjustScroll()
 }

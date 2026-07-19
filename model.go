@@ -46,6 +46,7 @@ type ActionRecord struct {
 type TabState struct {
 	currentDir          string
 	filesPath           []string
+	filteredFiles       []string
 	cursor              int
 	scrollOffset        int
 	previewScrollOffset int
@@ -89,6 +90,17 @@ type model struct {
 	copyJobFileName           string
 	copyProgressChan          chan tea.Msg
 	copyJobCancel             chan struct{}
+	searchActive              bool
+	searchText                string
+	searchCursor              int
+}
+
+
+func (t *TabState) visibleFiles() []string {
+	if t.filteredFiles != nil {
+		return t.filteredFiles
+	}
+	return t.filesPath
 }
 
 func (m *model) curTab() *TabState {
@@ -296,9 +308,10 @@ func (m *model) getMaxVisibleFiles() int {
 	}
 	// rows consumed inside the box beyond the file list:
 	//   1 = path header line
+	//   3 = search bar lines (with border)
 	//   1 = metadata bar at bottom
 	//   2 = input prompt lines (only in inputMode)
-	consumed := 2
+	consumed := 5
 	if m.inputMode {
 		consumed += 2
 	}
@@ -311,7 +324,7 @@ func (m *model) getMaxVisibleFiles() int {
 
 func (m *model) adjustScroll() {
 	t := m.curTab()
-	if len(t.filesPath) == 0 {
+	if len(t.visibleFiles()) == 0 {
 		t.scrollOffset = 0
 		return
 	}
@@ -330,8 +343,8 @@ func (m *model) adjustScroll() {
 		t.scrollOffset = t.cursor - maxVisible + 1
 	}
 
-	if t.scrollOffset > len(t.filesPath)-maxVisible {
-		t.scrollOffset = len(t.filesPath) - maxVisible
+	if t.scrollOffset > len(t.visibleFiles())-maxVisible {
+		t.scrollOffset = len(t.visibleFiles()) - maxVisible
 	}
 	if t.scrollOffset < 0 {
 		t.scrollOffset = 0
@@ -406,7 +419,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.shortcutCursor++
 				}
 			} else if m.activePane == 1 {
-				if t.cursor < len(t.filesPath)-1 {
+				if t.cursor < len(t.visibleFiles())-1 {
 					t.cursor++
 					m.adjustScroll()
 				}
@@ -483,16 +496,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "p", "P":
 				m.copyMenuOpen = false
-				if len(t.filesPath) > 0 {
-					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+				if len(t.visibleFiles()) > 0 {
+					absPath := findAbsPath(t.currentDir, t.visibleFiles()[t.cursor])
 					if err := copyToClipboard(absPath); err != nil {
 						m.err = err
 					}
 				}
 			case "n", "N":
 				m.copyMenuOpen = false
-				if len(t.filesPath) > 0 {
-					name := t.filesPath[t.cursor]
+				if len(t.visibleFiles()) > 0 {
+					name := t.visibleFiles()[t.cursor]
 					if !isDir(t.currentDir, name) {
 						name = strings.TrimSuffix(name, filepath.Ext(name))
 					}
@@ -502,8 +515,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "e", "E":
 				m.copyMenuOpen = false
-				if len(t.filesPath) > 0 {
-					name := t.filesPath[t.cursor]
+				if len(t.visibleFiles()) > 0 {
+					name := t.visibleFiles()[t.cursor]
 					if err := copyToClipboard(name); err != nil {
 						m.err = err
 					}
@@ -518,8 +531,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "c", "C":
 				m.copyMenuOpen = false
-				if len(t.filesPath) > 0 {
-					name := t.filesPath[t.cursor]
+				if len(t.visibleFiles()) > 0 {
+					name := t.visibleFiles()[t.cursor]
 					absPath := findAbsPath(t.currentDir, name)
 					if isDir(t.currentDir, name) {
 						m.err = fmt.Errorf("cannot copy content: %s is a directory", name)
@@ -538,8 +551,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "s", "S":
 				m.bookmarkMenuOpen = false
-				if len(t.filesPath) > 0 {
-					name := t.filesPath[t.cursor]
+				if len(t.visibleFiles()) > 0 {
+					name := t.visibleFiles()[t.cursor]
 					absPath := findAbsPath(t.currentDir, name)
 					if isDir(t.currentDir, name) {
 						baseName := filepath.Base(absPath)
@@ -620,14 +633,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					for idx := range m.selected {
 						targetIndices = append(targetIndices, idx)
 					}
-				} else if len(t.filesPath) > 0 {
+				} else if len(t.visibleFiles()) > 0 {
 					targetIndices = append(targetIndices, t.cursor)
 				}
 
 				deletedCount := 0
 				for _, idx := range targetIndices {
-					if idx >= 0 && idx < len(t.filesPath) {
-						absPath := findAbsPath(t.currentDir, t.filesPath[idx])
+					if idx >= 0 && idx < len(t.visibleFiles()) {
+						absPath := findAbsPath(t.currentDir, t.visibleFiles()[idx])
 						if err := permanentDelete(absPath); err != nil {
 							m.err = err
 							break
@@ -648,15 +661,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					for idx := range m.selected {
 						targetIndices = append(targetIndices, idx)
 					}
-				} else if len(t.filesPath) > 0 {
+				} else if len(t.visibleFiles()) > 0 {
 					targetIndices = append(targetIndices, t.cursor)
 				}
 
 				deletedCount := 0
 				for _, idx := range targetIndices {
-					if idx >= 0 && idx < len(t.filesPath) {
-						absPath := findAbsPath(t.currentDir, t.filesPath[idx])
-						isDirItem := isDir(t.currentDir, t.filesPath[idx])
+					if idx >= 0 && idx < len(t.visibleFiles()) {
+						absPath := findAbsPath(t.currentDir, t.visibleFiles()[idx])
+						isDirItem := isDir(t.currentDir, t.visibleFiles()[idx])
 						trashPath, err := normalDelete(absPath)
 						if err != nil {
 							m.err = err
@@ -687,8 +700,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch msg.String() {
 			case "x", "X":
 				m.permissionMenuOpen = false
-				if len(t.filesPath) > 0 {
-					absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+				if len(t.visibleFiles()) > 0 {
+					absPath := findAbsPath(t.currentDir, t.visibleFiles()[t.cursor])
 					oldMode, newMode, err := toggleExecutable(absPath)
 					if err != nil {
 						m.err = err
@@ -718,24 +731,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case "C":
 				m.openMenuOpen = false
-				if len(t.filesPath) > 0 {
-					targetPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+				if len(t.visibleFiles()) > 0 {
+					targetPath := findAbsPath(t.currentDir, t.visibleFiles()[t.cursor])
 					if err := openWithVSCode(targetPath); err != nil {
 						m.err = err
 					}
 				}
 			case "r", "R":
 				m.openMenuOpen = false
-				if len(t.filesPath) > 0 {
-					targetPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+				if len(t.visibleFiles()) > 0 {
+					targetPath := findAbsPath(t.currentDir, t.visibleFiles()[t.cursor])
 					if err := revealInFileExplorer(targetPath); err != nil {
 						m.err = err
 					}
 				}
 			case "e", "E":
 				m.openMenuOpen = false
-				if len(t.filesPath) > 0 {
-					name := t.filesPath[t.cursor]
+				if len(t.visibleFiles()) > 0 {
+					name := t.visibleFiles()[t.cursor]
 					if isDir(t.currentDir, name) {
 						break
 					}
@@ -837,6 +850,53 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+
+		if m.searchActive {
+			switch msg.String() {
+			case "esc":
+				m.searchActive = false
+				m.searchText = ""
+				m.searchCursor = 0
+				t := m.curTab()
+				t.filteredFiles = nil
+				t.cursor = 0
+				t.scrollOffset = 0
+				m.adjustScroll()
+			case "enter":
+				m.searchActive = false
+			case "backspace":
+				runes := []rune(m.searchText)
+				if m.searchCursor > 0 {
+					runes = append(runes[:m.searchCursor-1], runes[m.searchCursor:]...)
+					m.searchCursor--
+					m.searchText = string(runes)
+					m.applySearchFilter()
+				}
+			case "left":
+				if m.searchCursor > 0 {
+					m.searchCursor--
+				}
+			case "right":
+				if m.searchCursor < len([]rune(m.searchText)) {
+					m.searchCursor++
+				}
+			case "home":
+				m.searchCursor = 0
+			case "end":
+				m.searchCursor = len([]rune(m.searchText))
+			default:
+				char := msg.String()
+				if len(char) == 1 || (len(char) > 1 && !strings.HasPrefix(char, "ctrl+")) {
+					runes := []rune(m.searchText)
+					runes = append(runes[:m.searchCursor], append([]rune(char), runes[m.searchCursor:]...)...)
+					m.searchCursor += len([]rune(char))
+					m.searchText = string(runes)
+					m.applySearchFilter()
+				}
+			}
+			return m, nil
+		}
+
 		if m.inputMode {
 			switch msg.String() {
 			case "enter":
@@ -848,8 +908,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 				if m.isRenaming {
-					if len(t.filesPath) > 0 {
-						oldName := t.filesPath[t.cursor]
+					if len(t.visibleFiles()) > 0 {
+						oldName := t.visibleFiles()[t.cursor]
 						oldPath := findAbsPath(t.currentDir, oldName)
 						newPath := filepath.Join(t.currentDir, m.inputText)
 						if err := os.Rename(oldPath, newPath); err != nil {
@@ -1012,7 +1072,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "up", "k":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
@@ -1021,7 +1081,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if t.cursor > 0 {
 					t.cursor--
 				} else {
-					t.cursor = len(t.filesPath) - 1
+					t.cursor = len(t.visibleFiles()) - 1
 				}
 				m.adjustScroll()
 			} else if m.activePane == 2 {
@@ -1030,13 +1090,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case "down", "j":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
 			if m.activePane == 1 {
 				t.previewScrollOffset = 0
-				if t.cursor < len(t.filesPath)-1 {
+				if t.cursor < len(t.visibleFiles())-1 {
 					t.cursor++
 				} else {
 					t.cursor = 0
@@ -1047,7 +1107,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "space":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			_, ok := m.selected[t.cursor]
@@ -1058,11 +1118,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case "enter":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
-			if isDir(t.currentDir, t.filesPath[t.cursor]) {
-				selectedName := t.filesPath[t.cursor]
+			if isDir(t.currentDir, t.visibleFiles()[t.cursor]) {
+				selectedName := t.visibleFiles()[t.cursor]
 				nextDir := findAbsPath(t.currentDir, selectedName)
 				entries, err := os.ReadDir(nextDir)
 				if err != nil {
@@ -1075,15 +1135,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Rename
 		case "r", "R":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
 			m.inputMode = true
 			m.isRenaming = true
-			m.inputText = t.filesPath[t.cursor]
+			m.inputText = t.visibleFiles()[t.cursor]
 			// ponytail: cursor before ".ext"; dirs and dotfiles go to end
-			name := t.filesPath[t.cursor]
+			name := t.visibleFiles()[t.cursor]
 			m.inputCursor = len([]rune(name)) // default: end
 			if !isDir(t.currentDir, name) {
 				if dot := strings.LastIndex(name, "."); dot > 0 {
@@ -1109,26 +1169,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Toggle Select All ('a' / 'A')
 		case "a", "A":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
-			if len(m.selected) == len(t.filesPath) {
+			if len(m.selected) == len(t.visibleFiles()) {
 				m.selected = make(map[int]struct{})
 				m.statusMsg = "Deselected all item(s)"
 			} else {
 				m.selected = make(map[int]struct{})
-				for i := range t.filesPath {
+				for i := range t.visibleFiles() {
 					m.selected[i] = struct{}{}
 				}
-				m.statusMsg = fmt.Sprintf("Selected all %d item(s)", len(t.filesPath))
+				m.statusMsg = fmt.Sprintf("Selected all %d item(s)", len(t.visibleFiles()))
 			}
 		case "g", "G":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
-			name := t.filesPath[t.cursor]
+			name := t.visibleFiles()[t.cursor]
 			target, isSym, isBroken := getSymlinkTarget(t.currentDir, name)
 			if !isSym {
 				m.statusMsg = "Not a symbolic link"
@@ -1168,7 +1228,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					break
 				}
 				m.reLoadDir(targetDir, entries)
-				for idx, fname := range t.filesPath {
+				for idx, fname := range t.visibleFiles() {
 					if fname == targetBase {
 						t.cursor = idx
 						break
@@ -1180,11 +1240,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Create Symlink ('K')
 		case "K":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
-			selectedName := t.filesPath[t.cursor]
+			selectedName := t.visibleFiles()[t.cursor]
 			targetPath := findAbsPath(t.currentDir, selectedName)
 			linkName := fmt.Sprintf("%s_link", selectedName)
 			linkPath := filepath.Join(t.currentDir, linkName)
@@ -1203,8 +1263,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.selected) > 0 {
 				m.stagedPaths = nil
 				for idx := range m.selected {
-					if idx >= 0 && idx < len(t.filesPath) {
-						absP := findAbsPath(t.currentDir, t.filesPath[idx])
+					if idx >= 0 && idx < len(t.visibleFiles()) {
+						absP := findAbsPath(t.currentDir, t.visibleFiles()[idx])
 						m.stagedPaths = append(m.stagedPaths, absP)
 					}
 				}
@@ -1224,16 +1284,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.selected) > 0 {
 				m.stagedPaths = nil
 				for idx := range m.selected {
-					if idx >= 0 && idx < len(t.filesPath) {
-						absP := findAbsPath(t.currentDir, t.filesPath[idx])
+					if idx >= 0 && idx < len(t.visibleFiles()) {
+						absP := findAbsPath(t.currentDir, t.visibleFiles()[idx])
 						m.stagedPaths = append(m.stagedPaths, absP)
 					}
 				}
 				m.stagedOp = "copy"
 				m.selected = make(map[int]struct{})
 				m.statusMsg = fmt.Sprintf("Copied %d item(s). Press 'v' or 'p' to paste.", len(m.stagedPaths))
-			} else if len(t.filesPath) > 0 {
-				absPath := findAbsPath(t.currentDir, t.filesPath[t.cursor])
+			} else if len(t.visibleFiles()) > 0 {
+				absPath := findAbsPath(t.currentDir, t.visibleFiles()[t.cursor])
 				if err := copyToClipboard(absPath); err != nil {
 					m.err = err
 				} else {
@@ -1276,7 +1336,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// copy menu
 		case "y", "Y":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
@@ -1289,7 +1349,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// delete menu
 		case "d", "D":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
@@ -1325,14 +1385,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.stagedOp = ""
 					m.reloadCurrentDir()
 				}
-			} else if len(t.filesPath) > 0 {
+			} else if len(t.visibleFiles()) > 0 {
 				m.err = nil
 				m.permissionMenuOpen = true
 			}
 
 		// Metadata Inspector dialog ('i' / 'I')
 		case "i", "I":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
@@ -1361,22 +1421,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// open menu
 		case "o", "O":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
 			m.openMenuOpen = true
 
 		case "right", "l", "L":
-			if len(t.filesPath) == 0 {
+			if len(t.visibleFiles()) == 0 {
 				break
 			}
 			m.err = nil
-			if !isDir(t.currentDir, t.filesPath[t.cursor]) {
+			if !isDir(t.currentDir, t.visibleFiles()[t.cursor]) {
 				break
 			}
 
-			selectedName := t.filesPath[t.cursor]
+			selectedName := t.visibleFiles()[t.cursor]
 			nextDir := findAbsPath(t.currentDir, selectedName)
 
 			entries, err := os.ReadDir(nextDir)
@@ -1404,7 +1464,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.showHidden = !m.showHidden
 			m.reloadCurrentDir()
 			m.adjustScroll()
+
+		case "s":
+			if m.activePane == 1 {
+				m.searchActive = true
+				m.searchText = ""
+				m.searchCursor = 0
+				return m, nil
+			}
 		}
+
 	}
 
 	return m, nil
@@ -1418,15 +1487,73 @@ func (m model) View() tea.View {
 	t := m.curTab()
 	renderedText := fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset)
 
+	// Search bar with border
+	searchIcon := ""
+	
+	sWidth := m.terminalWidth
+	if sWidth < 20 {
+		sWidth = 80
+	}
+	sShortcutWidth := 0
+	if m.shortcutPaneOpen {
+		sShortcutWidth = sWidth / 4
+		if sShortcutWidth < 14 {
+			sShortcutWidth = 14
+		}
+	}
+	var sLeftWidth int
+	if m.shortcutPaneOpen {
+		sLeftWidth = sWidth / 2
+		if sLeftWidth < 10 {
+			sLeftWidth = 10
+		}
+	} else {
+		sAvailableWidth := sWidth - sShortcutWidth
+		sLeftWidth = (sAvailableWidth * 2) / 3
+		if sLeftWidth < 10 {
+			sLeftWidth = sAvailableWidth / 2
+		}
+	}
+	
+	borderColor := "#555555" // Gray
+	if m.searchActive {
+		borderColor = "#5555FF" // Blue
+	}
+	
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(borderColor)).
+		Padding(0, 1).
+		Width(sLeftWidth - 6) // fit inside the left pane
+		
+	var boxContent string
+	if m.searchActive {
+		runes := []rune(m.searchText)
+		cur := m.searchCursor
+		if cur > len(runes) {
+			cur = len(runes)
+		}
+		before := string(runes[:cur])
+		after := string(runes[cur:])
+		boxContent = fmt.Sprintf("%s %s█%s", searchIcon, before, after)
+	} else if m.searchText != "" {
+		boxContent = fmt.Sprintf("%s %s", searchIcon, m.searchText)
+	} else {
+		boxContent = fmt.Sprintf("%s%s press s to search for file or directory%s", Gray, searchIcon, Reset)
+	}
+	
+	renderedText += boxStyle.Render(boxContent) + "\n"
+
 	maxVisible := m.getMaxVisibleFiles()
 
+	files := t.visibleFiles()
 	endIdx := t.scrollOffset + maxVisible
-	if endIdx > len(t.filesPath) {
-		endIdx = len(t.filesPath)
+	if endIdx > len(files) {
+		endIdx = len(files)
 	}
 
 	for i := t.scrollOffset; i < endIdx; i++ {
-		list := t.filesPath[i]
+		list := files[i]
 
 		displayName := list
 		if target, isSym, isBroken := getSymlinkTarget(t.currentDir, list); isSym {
@@ -1467,8 +1594,9 @@ func (m model) View() tea.View {
 	}
 
 	// Metadata bar pinned at bottom inside the border
-	if len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
-		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
+	files2 := t.visibleFiles()
+	if len(files2) > 0 && t.cursor >= 0 && t.cursor < len(files2) {
+		meta := getFileMetadataInfo(t.currentDir, files2[t.cursor])
 		renderedText += fmt.Sprintf("%s─%s %s%s | %s | %s | %s%s\n",
 			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
 	}
@@ -1717,8 +1845,8 @@ func (m model) View() tea.View {
 		maxVisiblePreviewLines = 1
 	}
 
-	if len(t.filesPath) > 0 {
-		selectedName := t.filesPath[t.cursor]
+	if len(t.visibleFiles()) > 0 {
+		selectedName := t.visibleFiles()[t.cursor]
 		targetPath := findAbsPath(t.currentDir, selectedName)
 		previewLines := getPreviewLines(targetPath, isDir(t.currentDir, selectedName), m.showHidden)
 
@@ -2031,8 +2159,8 @@ func (m model) View() tea.View {
 	}
 
 	// Render Metadata Inspector dialog if open
-	if m.metadataInspectorOpen && len(t.filesPath) > 0 && t.cursor >= 0 && t.cursor < len(t.filesPath) {
-		meta := getFileMetadataInfo(t.currentDir, t.filesPath[t.cursor])
+	if m.metadataInspectorOpen && len(t.visibleFiles()) > 0 && t.cursor >= 0 && t.cursor < len(t.visibleFiles()) {
+		meta := getFileMetadataInfo(t.currentDir, t.visibleFiles()[t.cursor])
 
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).

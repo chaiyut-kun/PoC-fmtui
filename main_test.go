@@ -1300,3 +1300,34 @@ func TestRenameCursor(t *testing.T) {
 		}
 	})
 }
+
+func TestSearchFilter(t *testing.T) {
+	m := InitialModel()
+	m.curTab().filesPath = []string{"alpha.txt", "beta.txt", "GAMMA.txt", "charlie.txt"}
+	m.searchActive = true
+
+	// Filter case insensitive
+	m.searchText = "M"
+	m.applySearchFilter()
+	
+	visible := m.curTab().visibleFiles()
+	if len(visible) != 1 {
+		t.Fatalf("Expected 1 match for 'M', got %d: %v", len(visible), visible)
+	}
+
+	// Filter multiple characters
+	m.searchText = "ma"
+	m.applySearchFilter()
+	visible = m.curTab().visibleFiles()
+	if len(visible) != 1 || visible[0] != "GAMMA.txt" {
+		t.Fatalf("Expected ['GAMMA.txt'] for 'ma', got %v", visible)
+	}
+
+	// Empty string should clear filter
+	m.searchText = ""
+	m.applySearchFilter()
+	visible = m.curTab().visibleFiles()
+	if len(visible) != 4 {
+		t.Fatalf("Expected 4 items for empty filter, got %d", len(visible))
+	}
+}
