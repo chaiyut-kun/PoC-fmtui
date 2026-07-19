@@ -1,119 +1,32 @@
-# Implementation Plan - Restructure Project Layout
+# Implementation Plan - Update Architecture Documentation
 
 ## Goal Description
-Restructure the application files into a standard, idiomatic Go project layout. This organizes the flat directory structure, separates the entry point from the UI/business logic, and keeps components modular.
-
-## Proposed Changes
-We propose moving from a flat root layout to a standard Go structure:
-- **`cmd/fm/main.go`**: The application's entry point (`package main`). It imports the TUI package and runs the Bubble Tea program.
-- **`internal/tui/`**: A private internal package (`package tui`) containing all user interface, layout, and event handling logic:
-  - `model.go`: Contains struct definitions (`Model`, `TabState`), helper methods, and initializers.
-  - `update.go`: Contains the Bubble Tea `Update(msg tea.Msg) (tea.Model, tea.Cmd)` logic (extracted from `model.go`).
-  - `view.go`: Contains the `View() tea.View` rendering logic (extracted from `model.go`).
-  - `utilities.go`: Contains filesystem helper methods and operations.
-  - `constant.go`: Contains colors, icons, and constants.
-  - `bookmarks.go`: Contains loading/saving of bookmarks.
-  - `tui_test.go` (renamed from `main_test.go`): Package-level unit tests.
-
-### Build and Tooling Updates
-- **`Makefile`**: Update targets (`dev`, `bd`) to run/build `./cmd/fm`.
-- **`build.sh`**: Update to build `./cmd/fm` as `fm` and copy to `GOPATH/bin`.
-- **`cd-on-exit.sh`**: Ensure it references the standard command `fm`.
+With the recent major updates (search & filter features, scroll layout alignment, and the Go project restructuring/code split), the system architecture has evolved. We need to update our architecture diagrams and documentation (`Architecture.md` and `.gemini/architecture_diagrams.md`) to accurately represent the current implementation instead of holding deprecated models.
 
 ---
 
-### Step-by-Step Proposed Changes
+## Proposed Changes
 
-#### [NEW] cmd/fm/main.go
-Entry point for the application.
-```go
-package main
+### Documentation Changes
 
-import (
-	"fmt"
-	"os"
+#### [MODIFY] Architecture.md (Root)
+Populate this empty root file with a high-level summary of the directory structure and package organization.
+- Explain the division between the entrypoint (`cmd/fm`) and the core application (`internal/tui`).
+- Document the role of the modularized TUI sub-files (`model.go`, `update.go`, `view.go`).
 
-	tea "charm.land/bubbletea/v2"
-	"file-list/internal/tui"
-)
-
-func main() {
-	program := tea.NewProgram(tui.InitialModel())
-	m, err := program.Run()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
-	_ = m
-}
-```
-
-#### [NEW] internal/tui/model.go
-Structs, initialization, and helper methods. The `model` struct will be exported as `Model` to make it accessible to `cmd/fm/main.go`.
-```go
-package tui
-
-// Imports...
-// Structs (Model, TabState, ActionRecord, ShortcutEntry)
-// InitialModel()
-// getMaxVisibleFiles()
-// adjustScroll()
-```
-
-#### [NEW] internal/tui/update.go
-Extracted `Update` loop for cleaner file separation.
-```go
-package tui
-
-import tea "charm.land/bubbletea/v2"
-
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-    // Key and mouse events...
-}
-```
-
-#### [NEW] internal/tui/view.go
-Extracted `View` rendering loop.
-```go
-package tui
-
-import tea "charm.land/bubbletea/v2"
-
-func (m Model) View() tea.View {
-    // Layout and rendering...
-}
-```
-
-#### [NEW] internal/tui/utilities.go
-Change package header to `package tui` and update method receivers to `Model`.
-
-#### [NEW] internal/tui/constant.go
-Change package header to `package tui`.
-
-#### [NEW] internal/tui/bookmarks.go
-Change package header to `package tui`.
-
-#### [NEW] internal/tui/tui_test.go
-Change package header to `package tui` and update tests to target exported `Model`.
-
-#### [DELETE] Flat files in root:
-- `main.go`
-- `model.go`
-- `utilities.go`
-- `constant.go`
-- `bookmarks.go`
-- `main_test.go`
+#### [MODIFY] .gemini/architecture_diagrams.md
+Update the Mermaid architecture diagrams to depict the actual layout of the application:
+- **Mermaid Block 1: Modular TUI Design**: Show how `model.go`, `update.go`, and `view.go` share package state and function calls.
+- **Mermaid Block 2: Search and Filter Pipeline**: Chart the data flow of search keypresses (`s` -> `Update()`), filtering logic (`applySearchFilter()` -> `t.filteredFiles`), and rendering via `t.visibleFiles()`.
+- **Mermaid Block 3: Binary Compilation Layout**: Map the compilation dependency structure.
 
 ---
 
 ## Verification Plan
 
 ### Automated Tests
-Run unit tests in the new package location:
-```bash
-go test ./internal/tui/...
-```
+Not applicable (documentation only).
 
 ### Manual Verification
-1. **Compilation**: Run `go build -o fm ./cmd/fm` to verify compilation.
-2. **Execution**: Run `./fm` and verify all functionalities (directory listing, navigation, search with active/inactive border, open menu, delete, rename, etc.) work exactly as before.
+1. Ensure both `.md` files compile markdown cleanly in rendering previews.
+2. Verify all path names and file references correspond exactly to the current folder tree.

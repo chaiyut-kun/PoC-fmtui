@@ -1,41 +1,16 @@
-# Walkthrough - Project Restructuring
+# Walkthrough - Architecture Documentation Update
 
-I have successfully restructured the application into a standard, clean, and idiomatic Go project layout!
+I have updated the architecture documentation and diagram files to match the current restructured codebase.
 
 ## Changes Made
-
-### 1. New Directory Layout
-- **`cmd/fm/main.go`**: Created the application entry point under `package main`. It imports `file-list/internal/tui` and invokes the Bubble Tea loop.
-- **`internal/tui/`**: Created the private package containing all app/TUI logic.
-- **`internal/tui/model.go`**: Contains structs (`model`, `TabState`, etc.), helper methods, and the `InitialModel()` initializer.
-- **`internal/tui/update.go`**: Extracted the keyboard, mouse, and process update loop from the monolithic `model.go` file.
-- **`internal/tui/view.go`**: Extracted the split-pane rendering view loop from `model.go`.
-- **`internal/tui/utilities.go`, `constant.go`, `bookmarks.go`**: Moved inside `internal/tui/` with package headers updated to `tui`.
-- **`internal/tui/tui_test.go`**: Renamed and moved the unit test suite under the `tui` package.
-
-### 2. Cleaned Root Directory
-- Removed the old flat `.go` source files (`main.go`, `model.go`, `utilities.go`, `constant.go`, `bookmarks.go`, `main_test.go`) from the root.
-
-### 3. Tooling and Script Updates
-- **`Makefile`**: Updated the `dev` target to point to `./cmd/fm`.
-- **`build.sh`**: Configured the build command to compile `cmd/fm` into `fm` and copy it to `GOPATH/bin/fm`.
-- **`cd-on-exit.sh`**: Corrected the invocation from `fmtui` to the official binary command `fm`.
+1. **`Architecture.md` (Root)**: Filled the previously empty root-level file with a comprehensive system overview, compilation diagram, sub-file roles breakdown, and details regarding directory handoffs.
+2. **`.gemini/architecture_diagrams.md`**: Overwrote outdated layered diagrams with accurate system representations:
+   - **Modular Package Diagram**: Maps the exact execution and file dependency relationships across `main.go`, `model.go`, `update.go`, `view.go`, `utilities.go`, `constant.go`, and `bookmarks.go`.
+   - **Search & Filter Pipeline**: Flows out the real-time keystroke capture, `visibleFiles()` slicing logic, and rendering pipelines.
+   - **Shell Handoff Sequence**: Outlines the sequence between the wrapper, binary execution, `/tmp/fmtui-dir` handoff write/clearing, and exiting.
 
 ---
 
-## Verification Results
-
-### 1. Automated Tests
-Ran the unit tests to verify package integrity and behavior:
-```bash
-go test ./...
-```
-**Result**:
-`ok      file-list/internal/tui  0.338s` (All tests passed cleanly)
-
-### 2. Compilation and Target Binary
-Built the executable from the new entry point:
-```bash
-go build -o fm ./cmd/fm
-```
-**Result**: Successfully compiled and generated the binary `fm` in the root directory and installed it to `GOPATH/bin/fm`.
+## Validation
+- Verified the documents compile cleanly.
+- Checked that all directory and file paths referenced in the documentation perfectly match the current workspace layout.
