@@ -43,7 +43,7 @@ type `fm` and `Enter`
 ## Examples
 
 #### **Navigate via directories**
-![navigate](./examples/Navigate.mp4)
+https://github.com/user-attachments/assets/619ede32-1c87-42a0-8b46-e140b5677205
 
 **You can navigate through directories with these keys**
 - `arrow left`, `h` for left navigate or step back to parents directory
@@ -52,12 +52,12 @@ type `fm` and `Enter`
 - `arrow right`, `l` for right navigate or enter to directory
 
 #### Toggle **close/open** `shortcuts pane` 
-![shortcut-pane-toggle](./examples/Toggle-shortcuts-pane.mp4)
+https://github.com/user-attachments/assets/4f3cb306-0968-4e18-a0aa-8786101d7c0e
 shortcuts pane for show shortcut directory and bookmark directory
 you can toggle close/open pane with `ctrl + b`
 
 #### Switch `pane`
-![switch-pane](./examples/switch-pane.mp4)
+https://github.com/user-attachments/assets/3564051c-672a-4554-b616-cc6881c0c815
 you can switch across pane with
 - `1` for `shortcuts pane`
 - `2` for `file explorer pane`
@@ -65,33 +65,33 @@ you can switch across pane with
 or use your pointer click at pane to switch
 
 #### Search file / directory
-![search](./examples/Search.mp4)
+https://github.com/user-attachments/assets/1b5c0610-1892-46fd-a767-4101018ad877
 you can search for file/directory in current directory by press `s` and type for search then `enter`
 
 #### create file
-![create-file](./examples/Create-file.mp4)
+https://github.com/user-attachments/assets/0ef862bb-9936-4dbf-86b8-201db5305c2b
 create file by just press `f` key. then type file name, file extension and `enter`
 
 #### create directory
-![create-directory](./examples/Create-directory.mp4)
+https://github.com/user-attachments/assets/a407818a-29d7-407b-b754-307715d5fd19
 create file by just press `m` key. then type directory name and `enter`
 
 #### copy file / directory
-![copy-action](./examples/copy.mp4)
+https://github.com/user-attachments/assets/b4fb4d00-393d-4f3b-8742-d5a747cb912c
 space to select one file / directory or multiple what you want to copy then `c` copy
 navigate to where you want then `v` to paste
 
 #### move file / directory
-![move-action](./examples/move.mp4)
+https://github.com/user-attachments/assets/cb9a0e4d-0fb7-4306-b71b-cee9e11e1650
 space to select one file / directory or multiple what you want to copy then `m` cut
 navigate to where you want then `v` to paste
 
 #### delete file / directory
-![delete-action](./examples/delete.mp4)
+https://github.com/user-attachments/assets/879cc49d-87ca-4e4f-ba05-4de592db9906
 you can delete one file / directory with press `d` 
 or delete multiple by `space` to what you want to select then `d` to delete
 then choose your choice
 
 #### rename file / directory
-![rename-action](./examples/rename.mp4)
+https://github.com/user-attachments/assets/b5a82c0a-60be-4d57-b88a-c6df74bc3152
 you can rename file / directory name with press `r` then rename and `enter`
