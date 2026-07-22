@@ -297,6 +297,78 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 			icon = MakeIcon
 			fgColor = Yellow
 			bgColor = BgYellow
+		} else if list == ".gitignore" {
+			icon = GitIgnoreIcon
+			fgColor = Gray
+			bgColor = GrayHighlight
+		} else if list == "Dockerfile" || list == "docker-compose.yml" || list == "docker-compose.yaml" {
+			icon = DockerFileIcon
+			fgColor = Blue
+			bgColor = BgBlue
+		} else if ext == ".ts" || ext == ".tsx" {
+			icon = TsIcon
+			fgColor = Blue
+			bgColor = BgBlue
+		} else if ext == ".pt" || ext == ".pth" {
+			icon = PtIcon
+			fgColor = Red
+			bgColor = BgRed
+		} else if ext == ".java" || ext == ".jar" {
+			icon = JavaIcon
+			fgColor = Red
+			bgColor = BgRed
+		} else if ext == ".css" || ext == ".scss" || ext == ".sass" || ext == ".less" {
+			icon = CssIcon
+			fgColor = Blue
+			bgColor = BgBlue
+		} else if ext == ".html" || ext == ".htm" {
+			icon = HtmlIcon
+			fgColor = Red
+			bgColor = BgRed
+		} else if ext == ".vue" {
+			icon = VueIcon
+			fgColor = Green
+			bgColor = BgGreen
+		} else if ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" || ext == ".sql" {
+			icon = SqliteIcon
+			fgColor = Yellow
+			bgColor = BgYellow
+		} else if ext == ".txt" || ext == ".log" || ext == ".env" {
+			icon = TextIcon
+			fgColor = Gray
+			bgColor = GrayHighlight
+		} else if ext == ".xls" || ext == ".xlsx" {
+			icon = XlsIcon
+			fgColor = Green
+			bgColor = BgGreen
+		} else if ext == ".doc" || ext == ".docx" {
+			icon = DocsIcon
+			fgColor = Blue
+			bgColor = BgBlue
+		} else if ext == ".csv" {
+			icon = CsvIcon
+			fgColor = Green
+			bgColor = BgGreen
+		} else if ext == ".ppt" || ext == ".pptx" {
+			icon = PptxIcon
+			fgColor = Red
+			bgColor = BgRed
+		} else if ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".rar" || ext == ".7z" || ext == ".bz2" || ext == ".xz" {
+			icon = CompressedIcon
+			fgColor = Yellow
+			bgColor = BgYellow
+		} else if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".svg" || ext == ".webp" || ext == ".ico" {
+			icon = ImageIcon
+			fgColor = Magenta
+			bgColor = BgMagenta
+		} else if ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" || ext == ".webm" {
+			icon = VdoIcon
+			fgColor = Magenta
+			bgColor = BgMagenta
+		} else if ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".ogg" || ext == ".aac" || ext == ".m4a" {
+			icon = AudioIcon
+			fgColor = Cyan
+			bgColor = BgCyan
 		} else {
 			icon = FileIcon
 			fgColor = Reset

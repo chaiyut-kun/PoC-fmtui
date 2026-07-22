@@ -26,9 +26,7 @@ const baseDir = "./files"
 const ItemEndSpace = " "
 
 const (
-
-	// const FileIcon = "\U0001F4C4" // 📄
-	DirIcon     = "\U0001F4C1" // 📁
+	DirIcon     = "\uf4d3"
 	FileIcon    = "\uf15b"
 	GoExt       = "\ue65e"
 	GoIcon      = "\ue627"
@@ -41,5 +39,30 @@ const (
 	PdfIcon     = "\uf1c1"
 	GitIcon     = "\ue709"
 	JsonIcon    = "\ue60b"
-	SymlinkIcon = "🔗"
+	SymlinkIcon = "\uf44c"
+
+	GitIgnoreIcon  = "\ue65d"
+	TsIcon         = "\ue69d"
+	PtIcon         = "\ue87b"
+	JavaIcon       = "\uedaf"
+	CssIcon        = "\ue749"
+	HtmlIcon       = "\ue736"
+	VueIcon        = "\ue6a0"
+	SqliteIcon     = "\ue7c4"
+	DockerFileIcon = "\uf21f"
+
+	// Office
+	TextIcon = "\ue64e"
+	XlsIcon  = "\ue6a6"
+	DocsIcon = "\ue6a5"
+	CsvIcon  = "\ueefc"
+	PptxIcon = "\uf1c4"
+
+	// special
+	CompressedIcon = "\uf410"
+
+	// image / vdo
+	ImageIcon = "\uf03e"
+	VdoIcon   = "\uf52c"
+	AudioIcon = "\uf1c7"
 )
