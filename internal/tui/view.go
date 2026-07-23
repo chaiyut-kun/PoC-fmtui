@@ -9,13 +9,17 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ponytail: View is a single massive function to avoid premature abstraction. 
+// Ceiling: When layout gets too complex to reason about, split into renderLeftPane, renderRightPane.
 func (m model) View() tea.View {
 	if m.quitting {
 		return tea.NewView("")
 	}
 
 	t := m.curTab()
-	renderedText := fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset)
+	var sb strings.Builder
+	sb.Grow(m.terminalWidth * m.terminalHeight) // ponytail: pre-allocate to prevent reallocation
+	sb.WriteString(fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset))
 
 	// Search bar with border
 	searchIcon := ""
@@ -72,7 +76,8 @@ func (m model) View() tea.View {
 		boxContent = fmt.Sprintf("%s%s press s to search for file or directory%s", Gray, searchIcon, Reset)
 	}
 	
-	renderedText += boxStyle.Render(boxContent) + "\n"
+	sb.WriteString(boxStyle.Render(boxContent))
+	sb.WriteString("\n")
 
 	maxVisible := m.getMaxVisibleFiles()
 
@@ -106,12 +111,12 @@ func (m model) View() tea.View {
 		}
 
 		if t.cursor == i {
-			renderedText += fmt.Sprintf("%s%s %s%s %s %s%s%s\n", bgColor, Black, cursorSymbol, selectMarker, icon, displayName, ItemEndSpace, Reset)
+			sb.WriteString(fmt.Sprintf("%s%s %s%s %s %s%s%s\n", bgColor, Black, cursorSymbol, selectMarker, icon, displayName, ItemEndSpace, Reset))
 		} else {
 			if fgColor == Reset {
-				renderedText += fmt.Sprintf(" %s%s %s %s%s\n", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
+				sb.WriteString(fmt.Sprintf(" %s%s %s %s%s\n", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace))
 			} else {
-				renderedText += fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, displayName, ItemEndSpace, Reset)
+				sb.WriteString(fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, displayName, ItemEndSpace, Reset))
 			}
 		}
 	}
@@ -120,15 +125,15 @@ func (m model) View() tea.View {
 	numRendered := endIdx - t.scrollOffset
 	paddingLines := maxVisible - numRendered
 	if paddingLines > 0 {
-		renderedText += strings.Repeat("\n", paddingLines)
+		sb.WriteString(strings.Repeat("\n", paddingLines))
 	}
 
 	// Metadata bar pinned at bottom inside the border
 	files2 := t.visibleFiles()
 	if len(files2) > 0 && t.cursor >= 0 && t.cursor < len(files2) {
 		meta := getFileMetadataInfo(t.currentDir, files2[t.cursor])
-		renderedText += fmt.Sprintf("%s─%s %s%s | %s | %s | %s%s\n",
-			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset)
+		sb.WriteString(fmt.Sprintf("%s─%s %s%s | %s | %s | %s%s\n",
+			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset))
 	}
 
 	if m.inputMode {
@@ -146,11 +151,11 @@ func (m model) View() tea.View {
 		}
 		before := string(runes[:cur])
 		after := string(runes[cur:])
-		renderedText += fmt.Sprintf("%s: %s█%s\n(Enter to confirm, Esc to cancel)\n", prompt, before, after)
+		sb.WriteString(fmt.Sprintf("%s: %s█%s\n(Enter to confirm, Esc to cancel)\n", prompt, before, after))
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
-	renderedText = strings.TrimSuffix(renderedText, "\n")
+	renderedText := strings.TrimSuffix(sb.String(), "\n")
 
 	width := m.terminalWidth
 	height := m.terminalHeight
