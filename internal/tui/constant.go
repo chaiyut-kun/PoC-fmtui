@@ -65,4 +65,7 @@ const (
 	ImageIcon = "\uf03e"
 	VdoIcon   = "\uf52c"
 	AudioIcon = "\uf1c7"
+
+	// windows
+	PsIcon = "\ue86c"
 )
