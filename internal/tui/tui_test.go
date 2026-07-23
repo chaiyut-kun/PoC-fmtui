@@ -63,7 +63,7 @@ func TestCopyToClipboard(t *testing.T) {
 func TestPaneSwitchingAndScrolling(t *testing.T) {
 	m := InitialModel()
 	m.tabs[m.activeTab].filesPath = []string{"file1.txt", "file2.txt"}
-	
+
 	// Default active pane should be 1 (Left Explorer)
 	if m.activePane != 1 {
 		t.Errorf("Expected activePane to be 1 by default, got %d", m.activePane)
@@ -111,33 +111,33 @@ func TestPreviewLineTruncation(t *testing.T) {
 	m.terminalWidth = 60
 	m.terminalHeight = 10
 	m.shortcutPaneOpen = false
-	
+
 	tempFile, err := os.CreateTemp("", "test_preview_truncation_*.txt")
 	if err != nil {
 		t.Fatalf("Failed to create temp file: %v", err)
 	}
 	defer os.Remove(tempFile.Name())
-	
+
 	content := "ShortLine\nLongLineWithManyCharactersAndMore\nTab\tSeparated\n"
 	if _, err := tempFile.WriteString(content); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
 	}
 	tempFile.Close()
-	
+
 	m.curTab().filesPath = []string{filepath.Base(tempFile.Name())}
 	m.curTab().currentDir = filepath.Dir(tempFile.Name())
 	m.curTab().cursor = 0
-	
+
 	view := m.View()
 	viewStr := view.Content
-	
+
 	if !strings.Contains(viewStr, "LongLineWithManyCh") {
 		t.Errorf("Expected truncated long line in view, view: %q", viewStr)
 	}
 	if strings.Contains(viewStr, "CharactersAndMore") {
 		t.Errorf("Expected long line to be truncated and not show full suffix, view: %q", viewStr)
 	}
-	
+
 	if !strings.Contains(viewStr, "Tab    Separated") {
 		t.Errorf("Expected tab to be expanded to 4 spaces, view: %q", viewStr)
 	}
@@ -1309,7 +1309,7 @@ func TestSearchFilter(t *testing.T) {
 	// Filter case insensitive
 	m.searchText = "M"
 	m.applySearchFilter()
-	
+
 	visible := m.curTab().visibleFiles()
 	if len(visible) != 1 {
 		t.Fatalf("Expected 1 match for 'M', got %d: %v", len(visible), visible)

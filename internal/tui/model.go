@@ -92,7 +92,6 @@ type model struct {
 	searchCursor              int
 }
 
-
 func (t *TabState) visibleFiles() []string {
 	if t.filteredFiles != nil {
 		return t.filteredFiles
@@ -353,4 +352,3 @@ func (m *model) adjustScroll() {
 		t.scrollOffset = 0
 	}
 }
-

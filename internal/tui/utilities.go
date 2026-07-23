@@ -165,10 +165,10 @@ func (m *model) refreshAllTabs() {
 		}
 
 		t.filesPath = t.filesPath[:0]
-	t.filteredFiles = nil
-	m.searchActive = false
-	m.searchText = ""
-	m.searchCursor = 0
+		t.filteredFiles = nil
+		m.searchActive = false
+		m.searchText = ""
+		m.searchCursor = 0
 		for _, entry := range entries {
 			if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 				continue
@@ -855,7 +855,6 @@ func truncatePathLeft(path string, maxWidth int) string {
 	}
 	return "..." + path[len(path)-(maxWidth-3):]
 }
-
 
 func (m *model) applySearchFilter() {
 	t := m.curTab()

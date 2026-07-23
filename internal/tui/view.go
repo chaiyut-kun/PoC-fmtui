@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// ponytail: View is a single massive function to avoid premature abstraction. 
+// ponytail: View is a single massive function to avoid premature abstraction.
 // Ceiling: When layout gets too complex to reason about, split into renderLeftPane, renderRightPane.
 func (m model) View() tea.View {
 	if m.quitting {
@@ -23,7 +23,7 @@ func (m model) View() tea.View {
 
 	// Search bar with border
 	searchIcon := ""
-	
+
 	sWidth := m.terminalWidth
 	if sWidth < 20 {
 		sWidth = 80
@@ -48,18 +48,18 @@ func (m model) View() tea.View {
 			sLeftWidth = sAvailableWidth / 2
 		}
 	}
-	
+
 	borderColor := "#555555" // Gray
 	if m.searchActive {
 		borderColor = "#5555FF" // Blue
 	}
-	
+
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(borderColor)).
 		Padding(0, 1).
 		Width(sLeftWidth - 6) // fit inside the left pane
-		
+
 	var boxContent string
 	if m.searchActive {
 		runes := []rune(m.searchText)
@@ -75,7 +75,7 @@ func (m model) View() tea.View {
 	} else {
 		boxContent = fmt.Sprintf("%s%s press s to search for file or directory%s", Gray, searchIcon, Reset)
 	}
-	
+
 	sb.WriteString(boxStyle.Render(boxContent))
 	sb.WriteString("\n")
 
