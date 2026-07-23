@@ -82,7 +82,7 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.bookmarks = append(m.bookmarks, ShortcutEntry{
 						Name: baseName,
 						Path: absPath,
-						Icon: "📁",
+						Icon: DirIcon,
 					})
 					if err := saveBookmarks(m.bookmarks); err != nil {
 						m.err = err
@@ -105,7 +105,7 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.bookmarks = append(m.bookmarks, ShortcutEntry{
 				Name: baseName,
 				Path: absPath,
-				Icon: "📁",
+				Icon: DirIcon,
 			})
 			if err := saveBookmarks(m.bookmarks); err != nil {
 				m.err = err

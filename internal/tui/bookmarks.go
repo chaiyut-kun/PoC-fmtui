@@ -21,6 +21,9 @@ func loadBookmarks() []ShortcutEntry {
 	if err := json.Unmarshal(data, &bookmarks); err != nil {
 		return nil
 	}
+	for i := range bookmarks {
+		bookmarks[i].Icon = DirIcon
+	}
 	return bookmarks
 }
 
