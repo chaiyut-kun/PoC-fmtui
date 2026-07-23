@@ -79,7 +79,7 @@ func (m model) handleShortcutKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.statusMsg = fmt.Sprintf("Jumped to %s", targetName)
 				}
 			}
-		case "esc", "left", "h", "ctrl+b":
+		case "esc", "left", "h", "ctrl+b", "\\":
 			m.shortcutPaneOpen = false
 			m.activePane = 1
 		}

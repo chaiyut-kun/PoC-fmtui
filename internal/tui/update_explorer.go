@@ -83,9 +83,11 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.err = nil
 
 	// Toggle Shortcut Pane
-	case "ctrl+b":
+	case "ctrl+b", "\\":
 		m.shortcutPaneOpen = !m.shortcutPaneOpen
-		if !m.shortcutPaneOpen && m.activePane == 0 {
+		if m.shortcutPaneOpen {
+			m.activePane = 0
+		} else if m.activePane == 0 {
 			m.activePane = 1
 		}
 

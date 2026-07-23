@@ -655,7 +655,7 @@ func (m model) View() tea.View {
 			"  tab                Switch active pane\n" +
 			"  [ / ]              Switch tab prev / next (or switch shortcuts/bookmarks tab in sidebar)\n" +
 			"  t / w              New tab / close tab\n" +
-			"  ctrl+b             Toggle shortcut sidebar pane\n" +
+			"  ctrl+b / \\          Toggle shortcut sidebar pane\n" +
 			"  b                  Open bookmark menu (add selected directory / CWD)\n" +
 			"  d                  Remove bookmark (only when inside Bookmarks tab)\n\n" +
 			"File Actions:\n" +

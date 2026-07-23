@@ -835,17 +835,20 @@ func TestShortcutPaneAction(t *testing.T) {
 		t.Fatalf("Expected shortcuts to be populated, got 0")
 	}
 
-	// Since shortcutPaneOpen is true by default, press "ctrl+b" to close it, then "ctrl+b" to open it
+	// Since shortcutPaneOpen is true by default, press "ctrl+b" to close it, then "\" to open it
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
 	m = updatedModel.(model)
 	if m.shortcutPaneOpen {
 		t.Errorf("Expected shortcutPaneOpen to be false after pressing 'ctrl+b'")
 	}
 
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "\\"})
 	m = updatedModel.(model)
 	if !m.shortcutPaneOpen {
-		t.Errorf("Expected shortcutPaneOpen to be true after pressing 'ctrl+b' again")
+		t.Errorf("Expected shortcutPaneOpen to be true after pressing '\\' again")
+	}
+	if m.activePane != 0 {
+		t.Errorf("Expected activePane to be auto-focused to 0 when opening with '\\', got %d", m.activePane)
 	}
 
 	// Focus the shortcut pane by pressing "1"
