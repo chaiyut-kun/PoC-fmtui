@@ -251,6 +251,12 @@ type editorFinishedMsg struct {
 	err error
 }
 
+func (m model) isAnyMenuOpen() bool {
+	return m.copyMenuOpen || m.bookmarkMenuOpen || m.deleteBookmarkConfirmOpen ||
+		m.deleteMenuOpen || m.permissionMenuOpen || m.openMenuOpen ||
+		m.helpMenuOpen || m.metadataInspectorOpen
+}
+
 func InitialModel() model {
 	currentDir, _ := os.Getwd()
 	entries, err := os.ReadDir(currentDir)
