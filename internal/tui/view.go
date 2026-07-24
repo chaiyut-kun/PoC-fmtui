@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -738,8 +739,146 @@ func (m model) View() tea.View {
 		content = strings.Join(bgLines, "\n")
 	}
 
+	// Render Quick Find overlay
+	if m.quickFindOpen {
+		dialogW := 120
+		if dialogW > width-4 {
+			dialogW = width - 4
+		}
+		if dialogW < 40 {
+			dialogW = 40
+		}
+
+		maxResults := 20
+		if maxResults > height-8 {
+			maxResults = height - 8
+		}
+		if maxResults < 5 {
+			maxResults = 5
+		}
+
+		// Build input line with cursor
+		runes := []rune(m.quickFindText)
+		cur := m.quickFindCursor
+		if cur > len(runes) {
+			cur = len(runes)
+		}
+		var inputLine string
+		searchIcon := ""
+		if m.quickFindSelecting {
+			inputLine = fmt.Sprintf("  %s %s  %s%s", searchIcon, Gray, m.quickFindText, Reset)
+		} else {
+			before := string(runes[:cur])
+			after := string(runes[cur:])
+			inputLine = fmt.Sprintf("  %s  %s█%s", searchIcon, before, after)
+		}
+
+		// Horizontal divider (dialogW - 4 accounts for Padding(1, 2) which takes 4 columns)
+		divider := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#55FFFF")).
+			Render(strings.Repeat("─", dialogW-4))
+
+		// Build results list
+		var resultLines []string
+		if len(m.quickFindResults) == 0 && m.quickFindText == "" {
+			resultLines = append(resultLines, fmt.Sprintf("  %sBookmarks are shown here…%s", Gray, Reset))
+		} else if len(m.quickFindResults) == 0 {
+			resultLines = append(resultLines, fmt.Sprintf("  %sNo results%s", Gray, Reset))
+		} else {
+			shown := m.quickFindResults
+			if len(shown) > maxResults {
+				shown = shown[:maxResults]
+			}
+			
+			// Compute available space for paths
+			pathMaxLen := dialogW - 8 - 25 - 6
+			if pathMaxLen < 15 {
+				pathMaxLen = 15
+			}
+
+			for i, r := range shown {
+				icon := r.Icon
+				if icon == "" {
+					icon = DirIcon
+				}
+				namePart := fmt.Sprintf("%-25s", r.Name)
+				if len(r.Name) > 25 {
+					namePart = r.Name[:22] + "..."
+				}
+
+				beautifiedPath := shrinkPath(r.Path, pathMaxLen)
+
+				line := fmt.Sprintf("  %s %s   %s%s%s", icon, namePart, Gray, beautifiedPath, Reset)
+				if m.quickFindSelecting && i == m.quickFindSelected {
+					line = fmt.Sprintf("%s▶ %s %s   %s%s%s", Cyan, icon, namePart, Gray, beautifiedPath, Reset)
+				}
+				resultLines = append(resultLines, line)
+			}
+		}
+
+		// Assemble dialog content
+		modeHint := "  Enter: select mode  •  Esc: close"
+		if m.quickFindSelecting {
+			modeHint = "  ↑↓/jk: navigate  •  Enter: jump  •  Esc: close"
+		}
+		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + fmt.Sprintf("%s%s%s", Gray, modeHint, Reset)
+
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#55FFFF")).
+			Padding(1, 2).
+			Width(dialogW)
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		dialogHeight := lipgloss.Height(dialog)
+		dialogWidth := lipgloss.Width(dialog)
+		startRow := (height - dialogHeight) / 3 // upper-third, like Notion
+		startCol := (width - dialogWidth) / 2
+
+		bgLines := strings.Split(content, "\n")
+		fgLines := strings.Split(dialog, "\n")
+		for r, fgLine := range fgLines {
+			row := startRow + r
+			if row >= 0 && row < len(bgLines) {
+				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+			}
+		}
+		content = strings.Join(bgLines, "\n")
+	}
+
 	v := tea.NewView(content)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v
+}
+
+// shrinkPath replaces user home path with ~/ and truncates in the middle if it exceeds maxLen.
+func shrinkPath(path string, maxLen int) string {
+	home, err := os.UserHomeDir()
+	if err == nil {
+		if path == home {
+			return "~"
+		}
+		if strings.HasPrefix(path, home+string(filepath.Separator)) {
+			path = "~" + path[len(home):]
+		}
+	}
+
+	if len(path) <= maxLen {
+		return path
+	}
+
+	prefixLen := maxLen / 3
+	suffixLen := maxLen - prefixLen - 4
+	if prefixLen < 3 {
+		prefixLen = 3
+	}
+	if suffixLen < 5 {
+		suffixLen = 5
+	}
+	if prefixLen+suffixLen+4 >= len(path) {
+		return path
+	}
+	return path[:prefixLen] + "..." + path[len(path)-suffixLen:]
 }

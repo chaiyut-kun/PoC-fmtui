@@ -127,6 +127,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		// Route based on active UI state
+		if m.quickFindOpen {
+			return m.handleQuickFindKeys(msg)
+		}
 		if m.isAnyMenuOpen() {
 			return m.handleMenuKeys(msg)
 		}

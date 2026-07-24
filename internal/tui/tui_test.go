@@ -1334,3 +1334,177 @@ func TestSearchFilter(t *testing.T) {
 		t.Fatalf("Expected 4 items for empty filter, got %d", len(visible))
 	}
 }
+
+// ── Quick Find tests ──────────────────────────────────────────────────────────
+
+func TestQuickFindOpen(t *testing.T) {
+	m := InitialModel()
+	m.bookmarks = []ShortcutEntry{
+		{Name: "Downloads", Path: "/home/test/Downloads", Icon: DirIcon},
+		{Name: "Documents", Path: "/home/test/Documents", Icon: DirIcon},
+	}
+
+	// ctrl+f should open overlay and pre-populate results with bookmarks
+	next, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+f"})
+	nm := next.(model)
+
+	if !nm.quickFindOpen {
+		t.Fatal("expected quickFindOpen=true after ctrl+f")
+	}
+	if nm.quickFindText != "" {
+		t.Fatalf("expected empty quickFindText, got %q", nm.quickFindText)
+	}
+	if len(nm.quickFindResults) != 2 {
+		t.Fatalf("expected 2 bookmark results, got %d", len(nm.quickFindResults))
+	}
+	if nm.quickFindSelecting {
+		t.Fatal("expected input mode (quickFindSelecting=false) on open")
+	}
+}
+
+func TestQuickFindEsc(t *testing.T) {
+	m := InitialModel()
+	m.quickFindOpen = true
+	m.quickFindText = "docs"
+	m.quickFindSelecting = true
+
+	next, _ := m.Update(tea.KeyPressMsg{Text: "esc"})
+	nm := next.(model)
+
+	if nm.quickFindOpen {
+		t.Fatal("expected quickFindOpen=false after esc")
+	}
+	if nm.quickFindText != "" {
+		t.Fatalf("expected empty text after esc, got %q", nm.quickFindText)
+	}
+	if nm.quickFindSelecting {
+		t.Fatal("expected quickFindSelecting=false after esc")
+	}
+}
+
+func TestQuickFindEnterSwitchesToSelectMode(t *testing.T) {
+	m := InitialModel()
+	m.quickFindOpen = true
+	m.quickFindResults = []ShortcutEntry{
+		{Name: "Downloads", Path: "/home/test/Downloads", Icon: DirIcon},
+	}
+
+	next, _ := m.Update(tea.KeyPressMsg{Text: "enter"})
+	nm := next.(model)
+
+	if !nm.quickFindSelecting {
+		t.Fatal("expected quickFindSelecting=true after Enter in input mode")
+	}
+	if nm.quickFindSelected != 0 {
+		t.Fatalf("expected cursor at 0, got %d", nm.quickFindSelected)
+	}
+}
+
+func TestQuickFindNavigation(t *testing.T) {
+	m := InitialModel()
+	m.quickFindOpen = true
+	m.quickFindSelecting = true
+	m.quickFindResults = []ShortcutEntry{
+		{Name: "A", Path: "/a", Icon: DirIcon},
+		{Name: "B", Path: "/b", Icon: DirIcon},
+		{Name: "C", Path: "/c", Icon: DirIcon},
+	}
+	m.quickFindSelected = 0
+
+	// down
+	next, _ := m.Update(tea.KeyPressMsg{Text: "down"})
+	nm := next.(model)
+	if nm.quickFindSelected != 1 {
+		t.Fatalf("expected selected=1 after down, got %d", nm.quickFindSelected)
+	}
+
+	// j also moves down
+	next, _ = nm.Update(tea.KeyPressMsg{Text: "j"})
+	nm = next.(model)
+	if nm.quickFindSelected != 2 {
+		t.Fatalf("expected selected=2 after j, got %d", nm.quickFindSelected)
+	}
+
+	// up
+	next, _ = nm.Update(tea.KeyPressMsg{Text: "up"})
+	nm = next.(model)
+	if nm.quickFindSelected != 1 {
+		t.Fatalf("expected selected=1 after up, got %d", nm.quickFindSelected)
+	}
+}
+
+func TestQuickFindFilterBookmarks(t *testing.T) {
+	m := InitialModel()
+	m.bookmarks = []ShortcutEntry{
+		{Name: "UniqueDownloadsTest", Path: "/home/test/UniqueDownloadsTest", Icon: DirIcon},
+		{Name: "Documents", Path: "/home/test/Documents", Icon: DirIcon},
+		{Name: "Videos", Path: "/home/test/Videos", Icon: DirIcon},
+	}
+
+	results := m.buildQuickFindResults("uniquedownloadstest")
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result for 'uniquedownloadstest', got %d: %v", len(results), results)
+	}
+	if results[0].Name != "UniqueDownloadsTest" {
+		t.Fatalf("expected UniqueDownloadsTest, got %s", results[0].Name)
+	}
+
+	// Empty query returns all bookmarks
+	results = m.buildQuickFindResults("")
+	// Since results can contain user's real bookmarks, we only assert it contains at least our mock ones.
+	if len(results) < 3 {
+		t.Fatalf("expected at least 3 results for empty query, got %d", len(results))
+	}
+}
+
+func TestHandleTextEdit(t *testing.T) {
+	cases := []struct {
+		key      string
+		text     string
+		cursor   int
+		wantText string
+		wantCur  int
+	}{
+		{"a", "bc", 0, "abc", 1},
+		{"a", "bc", 2, "bca", 3},
+		{"backspace", "abc", 3, "ab", 2},
+		{"backspace", "abc", 0, "abc", 0}, // no-op at start
+		{"left", "abc", 2, "abc", 1},
+		{"right", "abc", 1, "abc", 2},
+		{"home", "abc", 3, "abc", 0},
+		{"end", "abc", 0, "abc", 3},
+	}
+	for _, c := range cases {
+		gotText, gotCur := handleTextEdit(c.key, c.text, c.cursor)
+		if gotText != c.wantText || gotCur != c.wantCur {
+			t.Errorf("handleTextEdit(%q, %q, %d) = (%q, %d); want (%q, %d)",
+				c.key, c.text, c.cursor, gotText, gotCur, c.wantText, c.wantCur)
+		}
+	}
+}
+
+func TestShrinkPath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("skipping home dir dependent tests")
+	}
+
+	cases := []struct {
+		path     string
+		maxLen   int
+		expected string
+	}{
+		{home, 30, "~"},
+		{filepath.Join(home, "Downloads"), 30, "~/Downloads"},
+		{filepath.Join(home, "coding", "Go", "tui", "poc-fmtui"), 20, "~/codi.../poc-fmtui"},
+		{"/var/log/syslog/extremely/long/path/name/here", 20, "/var/l.../name/here"},
+	}
+
+	for _, c := range cases {
+		got := shrinkPath(c.path, c.maxLen)
+		if got != c.expected {
+			t.Errorf("shrinkPath(%q, %d) = %q; want %q", c.path, c.maxLen, got, c.expected)
+		}
+	}
+}
+

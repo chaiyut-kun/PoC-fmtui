@@ -90,6 +90,12 @@ type model struct {
 	searchActive              bool
 	searchText                string
 	searchCursor              int
+	quickFindOpen             bool
+	quickFindText             string
+	quickFindCursor           int
+	quickFindResults          []ShortcutEntry
+	quickFindSelected         int
+	quickFindSelecting        bool // false=input mode, true=select mode
 }
 
 func (t *TabState) visibleFiles() []string {
@@ -253,7 +259,7 @@ type editorFinishedMsg struct {
 func (m model) isAnyMenuOpen() bool {
 	return m.copyMenuOpen || m.bookmarkMenuOpen || m.deleteBookmarkConfirmOpen ||
 		m.deleteMenuOpen || m.permissionMenuOpen || m.openMenuOpen ||
-		m.helpMenuOpen || m.metadataInspectorOpen
+		m.helpMenuOpen || m.metadataInspectorOpen || m.quickFindOpen
 }
 
 func InitialModel() model {

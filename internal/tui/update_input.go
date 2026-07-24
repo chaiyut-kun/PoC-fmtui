@@ -238,3 +238,94 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 	return m, nil
 }
+
+// handleTextEdit applies a single key event to a (text, cursor) pair.
+// Handles: printable chars, backspace, left/right/home/end.
+// ponytail: pure function — no model mutation, easy to test.
+func handleTextEdit(key, text string, cursor int) (string, int) {
+	runes := []rune(text)
+	switch key {
+	case "left":
+		if cursor > 0 {
+			cursor--
+		}
+	case "right":
+		if cursor < len(runes) {
+			cursor++
+		}
+	case "home":
+		cursor = 0
+	case "end":
+		cursor = len(runes)
+	case "backspace":
+		if cursor > 0 {
+			runes = append(runes[:cursor-1], runes[cursor:]...)
+			text = string(runes)
+			cursor--
+		}
+	default:
+		r := []rune(key)
+		if len(r) == 1 {
+			runes = append(runes[:cursor], append([]rune{r[0]}, runes[cursor:]...)...)
+			text = string(runes)
+			cursor++
+		}
+	}
+	return text, cursor
+}
+
+func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.quickFindOpen = false
+		m.quickFindText = ""
+		m.quickFindResults = nil
+		m.quickFindSelecting = false
+
+	case "enter":
+		if m.quickFindSelecting {
+			if m.quickFindSelected >= 0 && m.quickFindSelected < len(m.quickFindResults) {
+				dir := m.quickFindResults[m.quickFindSelected].Path
+				entries, err := os.ReadDir(dir)
+				if err != nil {
+					m.err = err
+				} else {
+					m.reLoadDir(dir, entries)
+					m.adjustScroll()
+				}
+			}
+			m.quickFindOpen = false
+			m.quickFindText = ""
+			m.quickFindResults = nil
+			m.quickFindSelecting = false
+		} else {
+			if len(m.quickFindResults) > 0 {
+				m.quickFindSelecting = true
+				m.quickFindSelected = 0
+			}
+		}
+
+	case "tab":
+		if len(m.quickFindResults) > 0 {
+			m.quickFindSelecting = !m.quickFindSelecting
+		}
+
+	case "up", "k":
+		if m.quickFindSelecting && m.quickFindSelected > 0 {
+			m.quickFindSelected--
+		}
+
+	case "down", "j":
+		if m.quickFindSelecting && m.quickFindSelected < len(m.quickFindResults)-1 {
+			m.quickFindSelected++
+		}
+
+	default:
+		if !m.quickFindSelecting {
+			m.quickFindText, m.quickFindCursor = handleTextEdit(msg.String(), m.quickFindText, m.quickFindCursor)
+			m.quickFindResults = m.buildQuickFindResults(m.quickFindText)
+			m.quickFindSelected = 0
+		}
+	}
+	return m, nil
+}

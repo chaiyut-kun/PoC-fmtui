@@ -75,6 +75,14 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		_ = clearTempDirFile()
 		m.quitting = true
 		return m, tea.Quit
+	case "ctrl+f":
+		m.quickFindOpen = true
+		m.quickFindText = ""
+		m.quickFindCursor = 0
+		m.quickFindSelected = 0
+		m.quickFindSelecting = false
+		m.quickFindResults = m.buildQuickFindResults("")
+		return m, nil
 	case "esc":
 		m.selected = make(map[int]struct{})
 		m.stagedPaths = nil

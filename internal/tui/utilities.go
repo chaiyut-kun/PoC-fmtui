@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"os/user"
@@ -872,4 +873,57 @@ func (m *model) applySearchFilter() {
 	t.cursor = 0
 	t.scrollOffset = 0
 	m.adjustScroll()
+}
+
+// buildQuickFindResults returns matching ShortcutEntry items for the query.
+// Bookmarks are shown first (fast, in-memory). When query is non-empty, also
+// walks $HOME for matching dirs (sync, capped at 20 total).
+// ponytail: sync walk scoped to $HOME; ceiling: goroutine+channel for async walk.
+func (m model) buildQuickFindResults(query string) []ShortcutEntry {
+	q := strings.ToLower(query)
+	var results []ShortcutEntry
+
+	// 1. Bookmarks first
+	for _, b := range m.bookmarks {
+		if q == "" || strings.Contains(strings.ToLower(b.Name), q) ||
+			strings.Contains(strings.ToLower(b.Path), q) {
+			results = append(results, b)
+		}
+	}
+
+	if q == "" {
+		return results
+	}
+
+	// 2. Walk $HOME for additional matching dirs
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return results
+	}
+	seen := make(map[string]bool, len(results))
+	for _, r := range results {
+		seen[r.Path] = true
+	}
+
+	_ = filepath.WalkDir(home, func(path string, d fs.DirEntry, err error) error {
+		if err != nil || !d.IsDir() || seen[path] {
+			return nil
+		}
+		if strings.HasPrefix(d.Name(), ".") {
+			return filepath.SkipDir // skip hidden dirs
+		}
+		if strings.Contains(strings.ToLower(d.Name()), q) {
+			results = append(results, ShortcutEntry{
+				Name: d.Name(),
+				Path: path,
+				Icon: DirIcon,
+			})
+			seen[path] = true
+		}
+		if len(results) >= 20 {
+			return filepath.SkipAll
+		}
+		return nil
+	})
+	return results
 }
