@@ -54,6 +54,7 @@ type model struct {
 	activeTab                 int
 	selected                  map[int]struct{}
 	showHidden                bool
+	config                    UserConfig
 	err                       error
 	terminalHeight            int
 	terminalWidth             int
@@ -286,6 +287,7 @@ func InitialModel() model {
 		selected:         make(map[int]struct{}),
 		shortcuts:        buildShortcuts(),
 		bookmarks:        loadBookmarks(),
+		config:           loadUserConfig(),
 		activePane:       1,
 		shortcutPaneOpen: true,
 	}

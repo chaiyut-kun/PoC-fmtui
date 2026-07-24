@@ -883,6 +883,8 @@ var quickFindNoisy = map[string]bool{
 	"pkg": true, "mod": true, "go-workspace": true,
 	// Common build outputs / caches
 	"vendor": true, ".cache": true, "dist": true, "build": true, "target": true,
+	// Editors / Temp / Assets
+	".vscode": true, ".idea": true, "tmp": true, "temp": true,
 }
 
 // isDirOrSymlinkToDir returns true for real directories and symlinks to directories.
@@ -977,13 +979,34 @@ func (m model) buildQuickFindResults(query string) []ShortcutEntry {
 		}
 		for _, e := range entries {
 			name := e.Name()
-			if strings.HasPrefix(name, ".") || quickFindNoisy[name] {
-				continue
-			}
 			full := filepath.Join(dir, name)
-			if !isDirOrSymlinkToDir(e, full) {
-				continue
+			isDir := isDirOrSymlinkToDir(e, full)
+
+			if isDir {
+				// Skip hidden directories to protect search performance
+				if strings.HasPrefix(name, ".") || quickFindNoisy[name] {
+					continue
+				}
+				walk(full, depth+1)
+			} else {
+				// For files, skip noisy ones. Skip hidden files unless they are whitelisted.
+				if quickFindNoisy[name] {
+					continue
+				}
+				if strings.HasPrefix(name, ".") {
+					allowed := false
+					for _, allowedFile := range m.config.AllowedHiddenFiles {
+						if name == allowedFile {
+							allowed = true
+							break
+						}
+					}
+					if !allowed {
+						continue
+					}
+				}
 			}
+
 			lname := strings.ToLower(name)
 			score := 0
 			switch {
@@ -995,13 +1018,16 @@ func (m model) buildQuickFindResults(query string) []ShortcutEntry {
 				score = 1
 			}
 			if score > 0 && !seen[full] {
+				icon := FileIcon
+				if isDir {
+					icon = DirIcon
+				}
 				candidates = append(candidates, scored{
-					entry: ShortcutEntry{Name: name, Path: full, Icon: DirIcon},
+					entry: ShortcutEntry{Name: name, Path: full, Icon: icon},
 					score: score,
 				})
 				seen[full] = true
 			}
-			walk(full, depth+1)
 		}
 	}
 

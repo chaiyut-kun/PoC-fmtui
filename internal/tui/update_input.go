@@ -317,13 +317,36 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		if m.quickFindSelecting {
 			if m.quickFindSelected >= 0 && m.quickFindSelected < len(m.quickFindResults) {
-				dir := m.quickFindResults[m.quickFindSelected].Path
-				entries, err := os.ReadDir(dir)
-				if err != nil {
-					m.err = err
-				} else {
-					m.reLoadDir(dir, entries)
-					m.adjustScroll()
+				path := m.quickFindResults[m.quickFindSelected].Path
+				fi, err := os.Stat(path)
+				if err == nil {
+					if fi.IsDir() {
+						entries, err := os.ReadDir(path)
+						if err != nil {
+							m.err = err
+						} else {
+							m.reLoadDir(path, entries)
+							m.adjustScroll()
+						}
+					} else {
+						// File jump: load parent directory, then search index to focus it
+						dir := filepath.Dir(path)
+						entries, err := os.ReadDir(dir)
+						if err != nil {
+							m.err = err
+						} else {
+							m.reLoadDir(dir, entries)
+							t := m.curTab()
+							fileName := fi.Name()
+							for idx, f := range t.filesPath {
+								if f == fileName {
+									t.cursor = idx
+									break
+								}
+							}
+							m.adjustScroll()
+						}
+					}
 				}
 			}
 			m.quickFindOpen = false

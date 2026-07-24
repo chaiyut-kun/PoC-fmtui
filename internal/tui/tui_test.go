@@ -1645,3 +1645,77 @@ func TestQuickFindScoring(t *testing.T) {
 		}
 	}
 }
+
+func TestQuickFindFileJump(t *testing.T) {
+	// Create a temp folder structure containing a file:
+	// /tmp/qfjump/dir/file.txt
+	root := t.TempDir()
+	subDir := filepath.Join(root, "dir")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	targetFile := filepath.Join(subDir, "file.txt")
+	if err := os.WriteFile(targetFile, []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	m := InitialModel()
+	m.quickFindOpen = true
+	m.quickFindSelecting = true
+	m.quickFindSelected = 0
+	// Inject the file search result manually to avoid filesystem search variations
+	m.quickFindResults = []ShortcutEntry{
+		{Name: "file.txt", Path: targetFile, Icon: FileIcon},
+	}
+
+	// Pressing enter should trigger a file jump: parent folder loaded, and cursor focuses "file.txt"
+	next, _ := m.Update(tea.KeyPressMsg{Text: "enter"})
+	nm := next.(model)
+
+	if nm.quickFindOpen {
+		t.Fatal("expected quickFindOpen to close after selection")
+	}
+
+	// Check if correct parent dir is loaded
+	tab := nm.curTab()
+	if tab.currentDir != subDir {
+		t.Fatalf("expected currentDir to be %q, got %q", subDir, tab.currentDir)
+	}
+
+	// Check if file is highlighted (i.e. cursor is at the index of "file.txt")
+	found := false
+	for idx, f := range tab.filesPath {
+		if f == "file.txt" {
+			if tab.cursor != idx {
+				t.Fatalf("expected cursor to be at index %d for file.txt, got %d", idx, tab.cursor)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected file.txt to be in tab's filesPath")
+	}
+}
+
+func TestUserConfig(t *testing.T) {
+	// 1. Default config check
+	cfg := defaultUserConfig()
+	if len(cfg.AllowedHiddenFiles) == 0 {
+		t.Fatal("expected default allowed hidden files list to be non-empty")
+	}
+	
+	// Check standard whitelisted file present
+	found := false
+	for _, f := range cfg.AllowedHiddenFiles {
+		if f == ".zshrc" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected .zshrc in default config allowed list")
+	}
+}
+
+
