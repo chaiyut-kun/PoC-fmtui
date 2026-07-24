@@ -817,9 +817,9 @@ func (m model) View() tea.View {
 		}
 
 		// Assemble dialog content
-		modeHint := "  Enter: select mode  •  Esc: close"
+		modeHint := "  tab: toggle input - select  •  Enter: select mode  •  Esc: close"
 		if m.quickFindSelecting {
-			modeHint = "  ↑↓/jk: navigate  •  Enter: jump  •  Esc: close"
+			modeHint = "  tab: toggle input - select  •  ↑↓/jk: navigate  •  Enter: jump  •  Esc: close"
 		}
 		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + fmt.Sprintf("%s%s%s", Gray, modeHint, Reset)
 

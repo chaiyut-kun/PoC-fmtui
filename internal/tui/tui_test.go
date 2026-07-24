@@ -1403,22 +1403,41 @@ func TestQuickFindEnterSwitchesToSelectMode(t *testing.T) {
 func TestQuickFindNavigation(t *testing.T) {
 	m := InitialModel()
 	m.quickFindOpen = true
-	m.quickFindSelecting = true
-	m.quickFindResults = []ShortcutEntry{
+	m.quickFindSelecting = false // Input mode
+	m.quickFindText = ""
+	m.quickFindCursor = 0
+
+	// Typing 'j' should insert character
+	next, _ := m.Update(tea.KeyPressMsg{Text: "j"})
+	nm := next.(model)
+	if nm.quickFindText != "j" {
+		t.Fatalf("expected quickFindText='j', got %q", nm.quickFindText)
+	}
+
+	// Typing 'k' should insert character
+	next, _ = nm.Update(tea.KeyPressMsg{Text: "k"})
+	nm = next.(model)
+	if nm.quickFindText != "jk" {
+		t.Fatalf("expected quickFindText='jk', got %q", nm.quickFindText)
+	}
+
+	// Switch to select mode
+	nm.quickFindSelecting = true
+	nm.quickFindResults = []ShortcutEntry{
 		{Name: "A", Path: "/a", Icon: DirIcon},
 		{Name: "B", Path: "/b", Icon: DirIcon},
 		{Name: "C", Path: "/c", Icon: DirIcon},
 	}
-	m.quickFindSelected = 0
+	nm.quickFindSelected = 0
 
 	// down
-	next, _ := m.Update(tea.KeyPressMsg{Text: "down"})
-	nm := next.(model)
+	next, _ = nm.Update(tea.KeyPressMsg{Text: "down"})
+	nm = next.(model)
 	if nm.quickFindSelected != 1 {
 		t.Fatalf("expected selected=1 after down, got %d", nm.quickFindSelected)
 	}
 
-	// j also moves down
+	// j also moves down in select mode
 	next, _ = nm.Update(tea.KeyPressMsg{Text: "j"})
 	nm = next.(model)
 	if nm.quickFindSelected != 2 {

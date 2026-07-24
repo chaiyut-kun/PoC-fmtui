@@ -275,7 +275,25 @@ func handleTextEdit(key, text string, cursor int) (string, int) {
 }
 
 func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+
+	// Handle selection navigation keys only if selection mode is active
+	if m.quickFindSelecting {
+		switch key {
+		case "up", "k":
+			if m.quickFindSelected > 0 {
+				m.quickFindSelected--
+			}
+			return m, nil
+		case "down", "j":
+			if m.quickFindSelected < len(m.quickFindResults)-1 {
+				m.quickFindSelected++
+			}
+			return m, nil
+		}
+	}
+
+	switch key {
 	case "esc":
 		m.quickFindOpen = false
 		m.quickFindText = ""
@@ -310,19 +328,21 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.quickFindSelecting = !m.quickFindSelecting
 		}
 
-	case "up", "k":
-		if m.quickFindSelecting && m.quickFindSelected > 0 {
-			m.quickFindSelected--
+	case "up":
+		if len(m.quickFindResults) > 0 {
+			m.quickFindSelecting = true
+			m.quickFindSelected = len(m.quickFindResults) - 1
 		}
 
-	case "down", "j":
-		if m.quickFindSelecting && m.quickFindSelected < len(m.quickFindResults)-1 {
-			m.quickFindSelected++
+	case "down":
+		if len(m.quickFindResults) > 0 {
+			m.quickFindSelecting = true
+			m.quickFindSelected = 0
 		}
 
 	default:
 		if !m.quickFindSelecting {
-			m.quickFindText, m.quickFindCursor = handleTextEdit(msg.String(), m.quickFindText, m.quickFindCursor)
+			m.quickFindText, m.quickFindCursor = handleTextEdit(key, m.quickFindText, m.quickFindCursor)
 			m.quickFindResults = m.buildQuickFindResults(m.quickFindText)
 			m.quickFindSelected = 0
 		}
