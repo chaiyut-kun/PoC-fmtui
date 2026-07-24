@@ -440,9 +440,7 @@ func overlayLine(bg string, fg string, startCol int) string {
 	return result.String()
 }
 
-func visibleWidth(s string) int {
-	return lipgloss.Width(s)
-}
+
 
 func getPreviewLines(path string, isFolder bool, showHidden bool) []string {
 	if isFolder {

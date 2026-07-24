@@ -10,6 +10,16 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	colorCyan   = "#55FFFF"
+	colorGreen  = "#55FF55"
+	colorPurple = "#FF55FF"
+	colorRed    = "#FF5555"
+	colorYellow = "#FFFF55"
+	colorGray   = "#555555"
+	colorBlue   = "#5555FF"
+)
+
 // ponytail: View is a single massive function to avoid premature abstraction.
 // Ceiling: When layout gets too complex to reason about, split into renderLeftPane, renderRightPane.
 func (m model) View() tea.View {
@@ -58,9 +68,9 @@ func (m model) View() tea.View {
 
 	searchIcon := ""
 
-	borderColor := "#555555" // Gray
+	borderColor := colorGray
 	if m.searchActive {
-		borderColor = "#5555FF" // Blue
+		borderColor = colorBlue
 	}
 
 	boxStyle := lipgloss.NewStyle().
@@ -373,7 +383,7 @@ func (m model) View() tea.View {
 
 		progressStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#55FFFF")). // Cyan border
+			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(0, 1).
 			Width(progressWidth - 2).
 			Height(2) // 4 lines total including borders
@@ -470,7 +480,7 @@ func (m model) View() tea.View {
 	if m.copyMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#55FF55")). // Green border
+			BorderForeground(lipgloss.Color(colorGreen)). // Green border
 			Padding(1, 2)
 
 		dialogContent := "         Copy Menu\n\n" +
@@ -503,7 +513,7 @@ func (m model) View() tea.View {
 	if m.bookmarkMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#FF55FF")). // Purple border
+			BorderForeground(lipgloss.Color(colorPurple)). // Purple border
 			Padding(1, 2)
 
 		dialogContent := "    Bookmark Options\n\n" +
@@ -533,7 +543,7 @@ func (m model) View() tea.View {
 	if m.deleteBookmarkConfirmOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#FF5555")). // Red border
+			BorderForeground(lipgloss.Color(colorRed)). // Red border
 			Padding(1, 2)
 
 		var bookmarkName string
@@ -563,7 +573,7 @@ func (m model) View() tea.View {
 	if m.deleteMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#FF5555")). // Red border
+			BorderForeground(lipgloss.Color(colorRed)). // Red border
 			Padding(1, 2)
 
 		dialogContent := "Delete Menu\n\n" +
@@ -593,7 +603,7 @@ func (m model) View() tea.View {
 	if m.permissionMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#55FFFF")). // Cyan border
+			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(1, 2)
 
 		dialogContent := "  Permission Menu\n\n" +
@@ -622,7 +632,7 @@ func (m model) View() tea.View {
 	if m.openMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#FF55FF")). // Purple border
+			BorderForeground(lipgloss.Color(colorPurple)). // Purple border
 			Padding(1, 2)
 
 		dialogContent := "       Open Menu\n\n" +
@@ -654,7 +664,7 @@ func (m model) View() tea.View {
 	if m.helpMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#FFFF55")). // Yellow border
+			BorderForeground(lipgloss.Color(colorYellow)). // Yellow border
 			Padding(1, 4)
 
 		dialogContent := "FMTUI Help Menu\n\n" +
@@ -708,7 +718,7 @@ func (m model) View() tea.View {
 
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#55FFFF")). // Cyan border
+			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(1, 3)
 
 		symlinkLine := ""
@@ -783,7 +793,7 @@ func (m model) View() tea.View {
 
 		// Horizontal divider (dialogW - 4 accounts for Padding(1, 2) which takes 4 columns)
 		divider := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#55FFFF")).
+			Foreground(lipgloss.Color(colorCyan)).
 			Render(strings.Repeat("─", dialogW-4))
 
 		// Build results list
@@ -833,7 +843,7 @@ func (m model) View() tea.View {
 
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.DoubleBorder()).
-			BorderForeground(lipgloss.Color("#55FFFF")).
+			BorderForeground(lipgloss.Color(colorCyan)).
 			Padding(1, 2).
 			Width(dialogW)
 

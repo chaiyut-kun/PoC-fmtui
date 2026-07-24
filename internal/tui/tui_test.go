@@ -1617,10 +1617,6 @@ func TestQuickFindScoring(t *testing.T) {
 
 	// Query "tui" → exact match "tui" (score 3) should appear before "poc-fmtui" (score 1)
 	// We can't control the real filesystem here, so test the scoring logic directly.
-	type scored struct {
-		name  string
-		score int
-	}
 	cases := []struct {
 		query    string
 		name     string
