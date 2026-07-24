@@ -274,6 +274,20 @@ func handleTextEdit(key, text string, cursor int) (string, int) {
 	return text, cursor
 }
 
+// quickFindResultsMsg delivers async search results back to the Update loop.
+type quickFindResultsMsg struct {
+	results []ShortcutEntry
+}
+
+// quickFindSearchCmd runs the filesystem walk in a goroutine and returns a tea.Cmd.
+// ponytail: one goroutine per keystroke, cancelled naturally when results arrive;
+// ceiling: debounce timer or dedicated search goroutine with cancellation channel.
+func (m model) quickFindSearchCmd(query string) tea.Cmd {
+	return func() tea.Msg {
+		return quickFindResultsMsg{results: m.buildQuickFindResults(query)}
+	}
+}
+
 func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
 
@@ -343,8 +357,9 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	default:
 		if !m.quickFindSelecting {
 			m.quickFindText, m.quickFindCursor = handleTextEdit(key, m.quickFindText, m.quickFindCursor)
-			m.quickFindResults = m.buildQuickFindResults(m.quickFindText)
 			m.quickFindSelected = 0
+			// Walk runs in a goroutine; results arrive via quickFindResultsMsg.
+			return m, m.quickFindSearchCmd(m.quickFindText)
 		}
 	}
 	return m, nil

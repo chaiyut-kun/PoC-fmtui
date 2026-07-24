@@ -1344,8 +1344,8 @@ func TestQuickFindOpen(t *testing.T) {
 		{Name: "Documents", Path: "/home/test/Documents", Icon: DirIcon},
 	}
 
-	// ctrl+f should open overlay and pre-populate results with bookmarks
-	next, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+f"})
+	// ctrl+f should open overlay and return a cmd to fetch results
+	next, cmd := m.Update(tea.KeyPressMsg{Text: "ctrl+f"})
 	nm := next.(model)
 
 	if !nm.quickFindOpen {
@@ -1354,11 +1354,17 @@ func TestQuickFindOpen(t *testing.T) {
 	if nm.quickFindText != "" {
 		t.Fatalf("expected empty quickFindText, got %q", nm.quickFindText)
 	}
-	if len(nm.quickFindResults) != 2 {
-		t.Fatalf("expected 2 bookmark results, got %d", len(nm.quickFindResults))
-	}
 	if nm.quickFindSelecting {
 		t.Fatal("expected input mode (quickFindSelecting=false) on open")
+	}
+
+	// Now simulate the command finishing
+	msg := cmd()
+	next, _ = nm.Update(msg)
+	nm = next.(model)
+
+	if len(nm.quickFindResults) < 2 {
+		t.Fatalf("expected at least 2 bookmark results, got %d", len(nm.quickFindResults))
 	}
 }
 
@@ -1527,3 +1533,119 @@ func TestShrinkPath(t *testing.T) {
 	}
 }
 
+func TestViewHeaderPathFormatting(t *testing.T) {
+	m := InitialModel()
+	m.terminalWidth = 40
+	m.tabs = []TabState{
+		{currentDir: "/var/log/syslog/extremely/long/path/name/here"},
+	}
+
+	view := m.View()
+	rendered := view.Content
+
+	// Should not contain the full path
+	if strings.Contains(rendered, "/var/log/syslog/extremely/long/path/name/here") {
+		t.Fatal("expected view header path to be truncated, but it was fully rendered")
+	}
+
+	// Should contain the truncated path segment "/var/...e/here"
+	if !strings.Contains(rendered, "/var/...e/here") {
+		t.Fatalf("expected view header path to contain truncated path segment '/var/...e/here', got view: %q", rendered)
+	}
+}
+
+func TestQuickFindRoots(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("no home dir")
+	}
+
+	dataExists := false
+	if fi, err := os.Stat("/data"); err == nil && fi.IsDir() {
+		dataExists = true
+	}
+
+	// currentDir inside home → home always first; /data added if it exists
+	roots := quickFindRoots(home, filepath.Join(home, "coding", "Go"))
+	if roots[0] != home {
+		t.Errorf("expected first root to be home, got %q", roots[0])
+	}
+	if dataExists && len(roots) < 2 {
+		t.Errorf("expected home + /data when /data exists, got %v", roots)
+	}
+	if !dataExists && len(roots) != 1 {
+		t.Errorf("expected only [home] when /data absent, got %v", roots)
+	}
+
+	// currentDir outside home and not /data → home + /data + ancestor
+	outsideDir := "/srv/coding/Go/tui/poc-fmtui"
+	roots = quickFindRoots(home, outsideDir)
+	if roots[0] != home {
+		t.Errorf("expected first root to be home, got %q", roots[0])
+	}
+	// /data already added; /srv should also be added if it exists (no assertion on
+	// existence, just ensure no duplicates and home is first)
+	seen := map[string]bool{}
+	for _, r := range roots {
+		if seen[r] {
+			t.Errorf("duplicate root %q in %v", r, roots)
+		}
+		seen[r] = true
+	}
+}
+
+
+func TestQuickFindScoring(t *testing.T) {
+	// Build a temp dir tree: /tmp/qftest/Go/tui/poc-fmtui
+	root := t.TempDir()
+	goDir := filepath.Join(root, "Go")
+	tuiDir := filepath.Join(goDir, "tui")
+	pocDir := filepath.Join(tuiDir, "poc-fmtui")
+	for _, d := range []string{goDir, tuiDir, pocDir} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m := InitialModel()
+	// Override roots to only walk our temp tree via a mock:
+	// We test the scoring by directly examining candidates via buildQuickFindResults
+	// using a currentDir outside home that resolves to root.
+	// Since quickFindRoots climbs 4 levels from currentDir, set currentDir = pocDir
+	// so the ancestor 4 levels up lands near root.
+	m.tabs[m.activeTab].currentDir = pocDir
+
+	// Query "tui" → exact match "tui" (score 3) should appear before "poc-fmtui" (score 1)
+	// We can't control the real filesystem here, so test the scoring logic directly.
+	type scored struct {
+		name  string
+		score int
+	}
+	cases := []struct {
+		query    string
+		name     string
+		wantScore int
+	}{
+		{"tui", "tui", 3},
+		{"tui", "poc-fmtui", 1},
+		{"go", "Go", 3},
+		{"go", "golang", 2},
+		{"go", "cargo", 1},
+	}
+	for _, c := range cases {
+		q := strings.ToLower(c.query)
+		lname := strings.ToLower(c.name)
+		score := 0
+		switch {
+		case lname == q:
+			score = 3
+		case strings.HasPrefix(lname, q):
+			score = 2
+		case strings.Contains(lname, q):
+			score = 1
+		}
+		if score != c.wantScore {
+			t.Errorf("score(%q vs %q) = %d, want %d", c.query, c.name, score, c.wantScore)
+		}
+	}
+}

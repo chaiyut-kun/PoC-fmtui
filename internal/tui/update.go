@@ -24,6 +24,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case quickFindResultsMsg:
+		// Discard stale results if the overlay was closed while walk was running.
+		if m.quickFindOpen {
+			m.quickFindResults = msg.results
+		}
+		return m, nil
+
 	case copyProgressMsg:
 		m.copyJobProgress = msg.progress
 		return m, m.listenCopyProgress()

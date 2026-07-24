@@ -20,15 +20,12 @@ func (m model) View() tea.View {
 	t := m.curTab()
 	var sb strings.Builder
 	sb.Grow(m.terminalWidth * m.terminalHeight) // ponytail: pre-allocate to prevent reallocation
-	sb.WriteString(fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), t.currentDir, Reset))
-
-	// Search bar with border
-	searchIcon := ""
 
 	sWidth := m.terminalWidth
 	if sWidth < 20 {
 		sWidth = 80
 	}
+
 	sShortcutWidth := 0
 	if m.shortcutPaneOpen {
 		sShortcutWidth = sWidth / 4
@@ -49,6 +46,17 @@ func (m model) View() tea.View {
 			sLeftWidth = sAvailableWidth / 2
 		}
 	}
+
+	userPart := fmt.Sprintf(" %s: ", getCurrentUser())
+	maxPathLen := sLeftWidth - 2 - len(userPart)
+	if maxPathLen < 15 {
+		maxPathLen = 15
+	}
+	displayDir := shrinkPath(t.currentDir, maxPathLen)
+	sb.WriteString(fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), displayDir, Reset))
+
+
+	searchIcon := ""
 
 	borderColor := "#555555" // Gray
 	if m.searchActive {

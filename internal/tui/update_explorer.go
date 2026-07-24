@@ -81,8 +81,8 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.quickFindCursor = 0
 		m.quickFindSelected = 0
 		m.quickFindSelecting = false
-		m.quickFindResults = m.buildQuickFindResults("")
-		return m, nil
+		m.quickFindResults = nil
+		return m, m.quickFindSearchCmd("")
 	case "esc":
 		m.selected = make(map[int]struct{})
 		m.stagedPaths = nil
