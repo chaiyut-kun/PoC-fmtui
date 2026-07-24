@@ -479,7 +479,7 @@ func (m model) View() tea.View {
 	// Render copy menu if open
 	if m.copyMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorGreen)). // Green border
 			Padding(1, 2)
 
@@ -512,7 +512,7 @@ func (m model) View() tea.View {
 	// Render bookmark menu if open
 	if m.bookmarkMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorPurple)). // Purple border
 			Padding(1, 2)
 
@@ -542,7 +542,7 @@ func (m model) View() tea.View {
 	// Render delete bookmark confirmation menu if open
 	if m.deleteBookmarkConfirmOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorRed)). // Red border
 			Padding(1, 2)
 
@@ -572,7 +572,7 @@ func (m model) View() tea.View {
 	// Render delete menu if open
 	if m.deleteMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorRed)). // Red border
 			Padding(1, 2)
 
@@ -602,7 +602,7 @@ func (m model) View() tea.View {
 	// Render permission menu if open
 	if m.permissionMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(1, 2)
 
@@ -631,7 +631,7 @@ func (m model) View() tea.View {
 	// Render open menu if open
 	if m.openMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorPurple)). // Purple border
 			Padding(1, 2)
 
@@ -663,7 +663,7 @@ func (m model) View() tea.View {
 	// Render full help menu if open
 	if m.helpMenuOpen {
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorYellow)). // Yellow border
 			Padding(1, 4)
 
@@ -717,7 +717,7 @@ func (m model) View() tea.View {
 		meta := getFileMetadataInfo(t.currentDir, t.visibleFiles()[t.cursor])
 
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(1, 3)
 
@@ -842,7 +842,7 @@ func (m model) View() tea.View {
 		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + fmt.Sprintf("%s%s%s", Gray, modeHint, Reset)
 
 		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.DoubleBorder()).
+			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorCyan)).
 			Padding(1, 2).
 			Width(dialogW)
