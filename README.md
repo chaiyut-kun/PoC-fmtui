@@ -104,3 +104,7 @@ then choose your choice
 https://github.com/user-attachments/assets/b5a82c0a-60be-4d57-b88a-c6df74bc3152
 
 you can rename file / directory name with press `r` then rename and `enter`
+
+#### Quick Search
+
+you can use `ctrl + f` to open quick search inpired **Notion quick search**
