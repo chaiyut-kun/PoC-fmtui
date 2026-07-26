@@ -304,10 +304,7 @@ func (m *model) getMaxVisibleFiles() int {
 	if m.err != nil {
 		bottomBarLines = 2
 	}
-	boxHeight := m.terminalHeight - bottomBarLines
-	if boxHeight < 3 {
-		boxHeight = 3
-	}
+	boxHeight := max(m.terminalHeight-bottomBarLines, 3)
 	leftHeight := boxHeight - 2 // subtract top+bottom border
 	if m.copyJobActive {
 		leftHeight -= 4 // progress pane height
@@ -324,10 +321,7 @@ func (m *model) getMaxVisibleFiles() int {
 	if m.inputMode {
 		consumed += 2
 	}
-	maxVisible := leftHeight - consumed
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
+	maxVisible := max(leftHeight-consumed, 1)
 	return maxVisible
 }
 
