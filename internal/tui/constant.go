@@ -26,6 +26,8 @@ const baseDir = "./files"
 const ItemEndSpace = " "
 
 const (
+	CursorIcon = "▶"
+
 	DirIcon     = "\uf4d3"
 	FileIcon    = "\uf15b"
 	GoExt       = "\ue65e"

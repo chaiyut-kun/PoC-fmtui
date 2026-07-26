@@ -242,7 +242,6 @@ func buildShortcuts() []ShortcutEntry {
 		{Name: "Music", Path: filepath.Join(home, "Music"), Icon: "\uf001"},
 		{Name: "Pictures", Path: filepath.Join(home, "Pictures"), Icon: "\uf03e"},
 		{Name: "Videos", Path: filepath.Join(home, "Videos"), Icon: "\uf52c"},
-		// {Name: "/", Path: "/", Icon: "\uf013"},
 	}
 	var existing []ShortcutEntry
 	for _, c := range candidates {

@@ -65,7 +65,6 @@ func (m model) View() tea.View {
 	displayDir := shrinkPath(t.currentDir, maxPathLen)
 	sb.WriteString(fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), displayDir, Reset))
 
-
 	searchIcon := ""
 
 	borderColor := colorGray
@@ -122,7 +121,7 @@ func (m model) View() tea.View {
 
 		cursorSymbol := " "
 		if t.cursor == i {
-			cursorSymbol = ">"
+			cursorSymbol = CursorIcon
 		}
 		selectMarker := " "
 		if _, ok := m.selected[i]; ok {
@@ -256,7 +255,8 @@ func (m model) View() tea.View {
 			for i, s := range activeShortcuts {
 				cursor := "  "
 				if i == m.shortcutCursor {
-					cursor = "> "
+					// use space for icon gap with cursor
+					cursor = CursorIcon + " "
 				}
 				label := fmt.Sprintf("%s%s  %s%s", cursor, s.Icon, s.Name, Reset)
 				if i == m.shortcutCursor {
@@ -807,7 +807,7 @@ func (m model) View() tea.View {
 			if len(shown) > maxResults {
 				shown = shown[:maxResults]
 			}
-			
+
 			// Compute available space for paths
 			pathMaxLen := dialogW - 8 - 25 - 6
 			if pathMaxLen < 15 {
@@ -828,7 +828,7 @@ func (m model) View() tea.View {
 
 				line := fmt.Sprintf("  %s %s   %s%s%s", icon, namePart, Gray, beautifiedPath, Reset)
 				if m.quickFindSelecting && i == m.quickFindSelected {
-					line = fmt.Sprintf("%s▶ %s %s   %s%s%s", Cyan, icon, namePart, Gray, beautifiedPath, Reset)
+					line = fmt.Sprintf("%s%s %s %s   %s%s%s", Cyan, CursorIcon, icon, namePart, Gray, beautifiedPath, Reset)
 				}
 				resultLines = append(resultLines, line)
 			}
