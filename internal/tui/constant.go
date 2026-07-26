@@ -26,6 +26,7 @@ const ItemEndSpace = " "
 
 const (
 	CursorIcon = "▶"
+	SearchIcon = "\ue68f"
 
 	DirIcon     = "\uf4d3"
 	FileIcon    = "\uf15b"
@@ -69,4 +70,15 @@ const (
 
 	// windows
 	PsIcon = "\ue86c"
+)
+
+// dialog config
+const (
+	quickSearchWidthDefault     = 80
+	quickSearchHalfWidth        = 40
+	quickSearchMaxResultDefault = 20
+
+	DefaultYDivisor = 2
+
+	DefaultScreenWidth = 80
 )

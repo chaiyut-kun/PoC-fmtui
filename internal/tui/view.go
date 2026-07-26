@@ -18,6 +18,38 @@ const (
 	colorYellow = "#FFFF55"
 	colorGray   = "#555555"
 	colorBlue   = "#5555FF"
+
+	minScreenWidth       = 20
+	minScreenHeight      = 5
+	defaultScreenHeight  = 20
+	minBoxHeight         = 3
+	minLeftPaneWidth     = 10
+	minShortcutWidth     = 14
+	shortcutWidthRatio   = 4
+	openShortcutPaneRatio = 2
+
+	leftPaneRatioNumerator   = 2
+	leftPaneRatioDenominator = 3
+
+	minPathLen          = 15
+	pathHeaderPadding   = 2
+	searchBoxPadding    = 6
+	tabBorderOffset     = 4
+	paneBorderPadding   = 2
+	minWidthForFullTabs = 27
+
+	shortcutPathPadding = 4
+	copyJobHeightOffset = 4
+	minProgressWidth    = 14
+	progressLabelOffset = 25
+	minBarWidth         = 5
+	progressPaneHeight  = 2
+
+	dialogWidthPadding     = 8
+	shortcutNameFieldWidth = 25
+	layoutMarginOffset     = 6
+	pathPrefixRatio        = 3
+	pathTruncationOffset   = 4
 )
 
 // ponytail: View is a single massive function to avoid premature abstraction.
@@ -31,41 +63,40 @@ func (m model) View() tea.View {
 	var sb strings.Builder
 	sb.Grow(m.terminalWidth * m.terminalHeight) // ponytail: pre-allocate to prevent reallocation
 
+	// screen width
 	sWidth := m.terminalWidth
-	if sWidth < 20 {
-		sWidth = 80
+	if sWidth < minScreenWidth {
+		sWidth = DefaultScreenWidth
 	}
 
 	sShortcutWidth := 0
 	if m.shortcutPaneOpen {
-		sShortcutWidth = sWidth / 4
-		if sShortcutWidth < 14 {
-			sShortcutWidth = 14
+		sShortcutWidth = sWidth / shortcutWidthRatio
+		if sShortcutWidth < minShortcutWidth {
+			sShortcutWidth = minShortcutWidth
 		}
 	}
 	var sLeftWidth int
 	if m.shortcutPaneOpen {
-		sLeftWidth = sWidth / 2
-		if sLeftWidth < 10 {
-			sLeftWidth = 10
+		sLeftWidth = sWidth / openShortcutPaneRatio
+		if sLeftWidth < minLeftPaneWidth {
+			sLeftWidth = minLeftPaneWidth
 		}
 	} else {
 		sAvailableWidth := sWidth - sShortcutWidth
-		sLeftWidth = (sAvailableWidth * 2) / 3
-		if sLeftWidth < 10 {
-			sLeftWidth = sAvailableWidth / 2
+		sLeftWidth = (sAvailableWidth * leftPaneRatioNumerator) / leftPaneRatioDenominator
+		if sLeftWidth < minLeftPaneWidth {
+			sLeftWidth = sAvailableWidth / openShortcutPaneRatio
 		}
 	}
 
 	userPart := fmt.Sprintf(" %s: ", getCurrentUser())
-	maxPathLen := sLeftWidth - 2 - len(userPart)
-	if maxPathLen < 15 {
-		maxPathLen = 15
+	maxPathLen := sLeftWidth - pathHeaderPadding - len(userPart)
+	if maxPathLen < minPathLen {
+		maxPathLen = minPathLen
 	}
 	displayDir := shrinkPath(t.currentDir, maxPathLen)
 	sb.WriteString(fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), displayDir, Reset))
-
-	searchIcon := ""
 
 	borderColor := colorGray
 	if m.searchActive {
@@ -76,7 +107,7 @@ func (m model) View() tea.View {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(borderColor)).
 		Padding(0, 1).
-		Width(sLeftWidth - 6) // fit inside the left pane
+		Width(sLeftWidth - searchBoxPadding) // fit inside the left pane
 
 	var boxContent string
 	if m.searchActive {
@@ -87,11 +118,11 @@ func (m model) View() tea.View {
 		}
 		before := string(runes[:cur])
 		after := string(runes[cur:])
-		boxContent = fmt.Sprintf("%s %s█%s", searchIcon, before, after)
+		boxContent = fmt.Sprintf("%s %s█%s", SearchIcon, before, after)
 	} else if m.searchText != "" {
-		boxContent = fmt.Sprintf("%s %s", searchIcon, m.searchText)
+		boxContent = fmt.Sprintf("%s %s", SearchIcon, m.searchText)
 	} else {
-		boxContent = fmt.Sprintf("%s%s press s to search for file or directory%s", Gray, searchIcon, Reset)
+		boxContent = fmt.Sprintf("%s%s press s to search for file or directory%s", Gray, SearchIcon, Reset)
 	}
 
 	sb.WriteString(boxStyle.Render(boxContent))
@@ -177,11 +208,11 @@ func (m model) View() tea.View {
 
 	width := m.terminalWidth
 	height := m.terminalHeight
-	if width < 20 {
-		width = 80
+	if width < minScreenWidth {
+		width = DefaultScreenWidth
 	}
-	if height < 5 {
-		height = 20
+	if height < minScreenHeight {
+		height = defaultScreenHeight
 	}
 
 	bottomBarLines := 1
@@ -189,34 +220,34 @@ func (m model) View() tea.View {
 		bottomBarLines = 2
 	}
 	boxHeight := height - bottomBarLines
-	if boxHeight < 3 {
-		boxHeight = 3
+	if boxHeight < minBoxHeight {
+		boxHeight = minBoxHeight
 	}
 
 	// Calculate shortcut pane width
 	shortcutWidth := 0
 	if m.shortcutPaneOpen {
-		shortcutWidth = width / 4
-		if shortcutWidth < 14 {
-			shortcutWidth = 14
+		shortcutWidth = width / shortcutWidthRatio
+		if shortcutWidth < minShortcutWidth {
+			shortcutWidth = minShortcutWidth
 		}
 	}
 
 	var leftWidth, rightWidth int
 	if m.shortcutPaneOpen {
-		leftWidth = width / 2
-		if leftWidth < 10 {
-			leftWidth = 10
+		leftWidth = width / openShortcutPaneRatio
+		if leftWidth < minLeftPaneWidth {
+			leftWidth = minLeftPaneWidth
 		}
 		rightWidth = width - shortcutWidth - leftWidth
-		if rightWidth < 10 {
-			rightWidth = 10
+		if rightWidth < minLeftPaneWidth {
+			rightWidth = minLeftPaneWidth
 		}
 	} else {
 		availableWidth := width - shortcutWidth
-		leftWidth = (availableWidth * 2) / 3
-		if leftWidth < 10 {
-			leftWidth = availableWidth / 2
+		leftWidth = (availableWidth * leftPaneRatioNumerator) / leftPaneRatioDenominator
+		if leftWidth < minLeftPaneWidth {
+			leftWidth = availableWidth / openShortcutPaneRatio
 		}
 		rightWidth = availableWidth - leftWidth
 	}
@@ -269,16 +300,16 @@ func (m model) View() tea.View {
 			// ponytail: Append full path of active shortcut at the bottom of the pane
 			if m.shortcutCursor >= 0 && m.shortcutCursor < len(activeShortcuts) {
 				selectedPath := activeShortcuts[m.shortcutCursor].Path
-				maxWidth := shortcutWidth - 4
-				if maxWidth < 5 {
-					maxWidth = 5
+				maxWidth := shortcutWidth - shortcutPathPadding
+				if maxWidth < minBarWidth {
+					maxWidth = minBarWidth
 				}
 				truncatedPath := truncatePathLeft(selectedPath, maxWidth)
-				sep := strings.Repeat("─", shortcutWidth-2)
+				sep := strings.Repeat("─", shortcutWidth-paneBorderPadding)
 
 				linesCount := strings.Count(shortcutText, "\n") + 1
-				targetHeight := boxHeight - 2
-				paddingNeeded := targetHeight - linesCount - 2 // -2 for sep and path line
+				targetHeight := boxHeight - paneBorderPadding
+				paddingNeeded := targetHeight - linesCount - paneBorderPadding // subtract for sep and path line
 
 				if paddingNeeded > 0 {
 					shortcutText += strings.Repeat("\n", paddingNeeded)
@@ -301,7 +332,7 @@ func (m model) View() tea.View {
 		scLines := strings.Split(shortcutBox, "\n")
 		if len(scLines) > 0 {
 			var title string
-			if shortcutWidth-2 >= 27 {
+			if shortcutWidth-paneBorderPadding >= minWidthForFullTabs {
 				if m.shortcutTab == 0 {
 					title = " [Shortcuts] │ Bookmarks "
 				} else {
@@ -320,17 +351,17 @@ func (m model) View() tea.View {
 	}
 
 	// 1. Create left box (File Explorer)
-	leftHeight := boxHeight - 2
+	leftHeight := boxHeight - paneBorderPadding
 	if m.copyJobActive {
-		leftHeight -= 4
-		if leftHeight < 3 {
-			leftHeight = 3
+		leftHeight -= copyJobHeightOffset
+		if leftHeight < minBoxHeight {
+			leftHeight = minBoxHeight
 		}
 	}
 	leftStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
-		Width(leftWidth - 2).
+		Width(leftWidth - paneBorderPadding).
 		Height(leftHeight)
 
 	leftBox := leftStyle.Render(renderedText)
@@ -352,9 +383,9 @@ func (m model) View() tea.View {
 		}
 		rawTitle := " " + strings.Join(tabParts, " | ") + " "
 		title := []rune(rawTitle)
-		maxTitleLen := leftWidth - 4
-		if maxTitleLen > 6 && len(title) > maxTitleLen {
-			pathTrimmed := " ..." + string(title[len(title)-(maxTitleLen-4):])
+		maxTitleLen := leftWidth - tabBorderOffset
+		if maxTitleLen > searchBoxPadding && len(title) > maxTitleLen {
+			pathTrimmed := " ..." + string(title[len(title)-(maxTitleLen-tabBorderOffset):])
 			title = []rune(pathTrimmed)
 		}
 		leftLines[0] = createTopBorder(string(title), leftWidth, leftBorderColor, "2")
@@ -363,13 +394,13 @@ func (m model) View() tea.View {
 
 	if m.copyJobActive {
 		progressWidth := leftWidth
-		if progressWidth < 14 {
-			progressWidth = 14
+		if progressWidth < minProgressWidth {
+			progressWidth = minProgressWidth
 		}
 
-		barWidth := progressWidth - 25 // subtract space for borders and labels
-		if barWidth < 5 {
-			barWidth = 5
+		barWidth := progressWidth - progressLabelOffset // subtract space for borders and labels
+		if barWidth < minBarWidth {
+			barWidth = minBarWidth
 		}
 		filledLen := int(m.copyJobProgress * float64(barWidth))
 		if filledLen > barWidth {
@@ -385,8 +416,8 @@ func (m model) View() tea.View {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(0, 1).
-			Width(progressWidth - 2).
-			Height(2) // 4 lines total including borders
+			Width(progressWidth - paneBorderPadding).
+			Height(progressPaneHeight) // 4 lines total including borders
 
 		progressPane := progressStyle.Render(progressContent)
 		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, progressPane)
@@ -394,7 +425,7 @@ func (m model) View() tea.View {
 
 	// 2. Create right box (Previewer)
 	var rightText string
-	maxVisiblePreviewLines := boxHeight - 2
+	maxVisiblePreviewLines := boxHeight - paneBorderPadding
 	if maxVisiblePreviewLines < 1 {
 		maxVisiblePreviewLines = 1
 	}
@@ -421,7 +452,7 @@ func (m model) View() tea.View {
 			endLine = len(previewLines)
 		}
 
-		maxWidth := rightWidth - 2
+		maxWidth := rightWidth - paneBorderPadding
 		if maxWidth < 1 {
 			maxWidth = 1
 		}
@@ -442,8 +473,8 @@ func (m model) View() tea.View {
 	rightStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(rightBorderColor)).
-		Width(rightWidth - 2).
-		Height(boxHeight - 2)
+		Width(rightWidth - paneBorderPadding).
+		Height(boxHeight - paneBorderPadding)
 
 	rightBox := rightStyle.Render(rightText)
 
@@ -463,12 +494,6 @@ func (m model) View() tea.View {
 	}
 
 	// Bottom Help & Error Status Bar
-	// hiddenStatus := "OFF"
-	if m.showHidden {
-		// hiddenStatus = "ON"
-	}
-	// helpText := fmt.Sprintf(" Press 'q' to quit | ':' shell | 'space' select | 'a' all | 'c' copy | 'm' move | 'v'/'p' paste | 'g' jump link | 'K' mklink | 'e' exit&cd | '.' hidden:%s | '`' help", hiddenStatus)
-
 	if m.err != nil {
 		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
 	} else if m.statusMsg != "" {
@@ -492,7 +517,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render bookmark menu if open
@@ -508,7 +533,7 @@ func (m model) View() tea.View {
 			"Press any other key to close"
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render delete bookmark confirmation menu if open
@@ -524,7 +549,7 @@ func (m model) View() tea.View {
 		}
 		dialogContent := fmt.Sprintf("   Remove Bookmark?\n\nRemove bookmark for %q?\n\n   [y] Yes      [n] No", bookmarkName)
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render delete menu if open
@@ -540,7 +565,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render permission menu if open
@@ -555,7 +580,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render open menu if open
@@ -573,7 +598,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render full help menu if open
@@ -611,7 +636,7 @@ func (m model) View() tea.View {
 			"          Press ` or ESC to close"
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render Metadata Inspector dialog if open
@@ -642,20 +667,20 @@ func (m model) View() tea.View {
 			meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, meta.MimeOrType, symlinkLine)
 
 		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, 2)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
 	// Render Quick Find overlay
 	if m.quickFindOpen {
-		dialogW := 120
+		dialogW := quickSearchWidthDefault
 		if dialogW > width-4 {
 			dialogW = width - 4
 		}
 		if dialogW < 40 {
-			dialogW = 40
+			dialogW = quickSearchHalfWidth
 		}
 
-		maxResults := 20
+		maxResults := quickSearchMaxResultDefault
 		if maxResults > height-8 {
 			maxResults = height - 8
 		}
@@ -670,13 +695,13 @@ func (m model) View() tea.View {
 			cur = len(runes)
 		}
 		var inputLine string
-		searchIcon := ""
+
 		if m.quickFindSelecting {
-			inputLine = fmt.Sprintf("  %s %s  %s%s", searchIcon, Gray, m.quickFindText, Reset)
+			inputLine = fmt.Sprintf("  %s %s  %s%s", SearchIcon, Gray, m.quickFindText, Reset)
 		} else {
 			before := string(runes[:cur])
 			after := string(runes[cur:])
-			inputLine = fmt.Sprintf("  %s  %s█%s", searchIcon, before, after)
+			inputLine = fmt.Sprintf("  %s  %s█%s", SearchIcon, before, after)
 		}
 
 		// Horizontal divider (dialogW - 4 accounts for Padding(1, 2) which takes 4 columns)
@@ -697,9 +722,9 @@ func (m model) View() tea.View {
 			}
 
 			// Compute available space for paths
-			pathMaxLen := dialogW - 8 - 25 - 6
-			if pathMaxLen < 15 {
-				pathMaxLen = 15
+			pathMaxLen := dialogW - dialogWidthPadding - shortcutNameFieldWidth - layoutMarginOffset
+			if pathMaxLen < minPathLen {
+				pathMaxLen = minPathLen
 			}
 
 			for i, r := range shown {
@@ -708,8 +733,8 @@ func (m model) View() tea.View {
 					icon = DirIcon
 				}
 				namePart := fmt.Sprintf("%-25s", r.Name)
-				if len(r.Name) > 25 {
-					namePart = r.Name[:22] + "..."
+				if len(r.Name) > shortcutNameFieldWidth {
+					namePart = r.Name[:shortcutNameFieldWidth-3] + "..."
 				}
 
 				beautifiedPath := shrinkPath(r.Path, pathMaxLen)
@@ -723,9 +748,9 @@ func (m model) View() tea.View {
 		}
 
 		// Assemble dialog content
-		modeHint := "  tab: toggle input - select  •  Enter: select mode  •  Esc: close"
+		modeHint := "  tab: toggle input - select • Enter: select mode • Esc: close"
 		if m.quickFindSelecting {
-			modeHint = "  tab: toggle input - select  •  ↑↓/jk: navigate  •  Enter: jump  •  Esc: close"
+			modeHint = "  tab: toggle input - select • ↑↓/jk: navigate • Enter: jump • Esc: close"
 		}
 		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + fmt.Sprintf("%s%s%s", Gray, modeHint, Reset)
 
@@ -761,8 +786,8 @@ func shrinkPath(path string, maxLen int) string {
 		return path
 	}
 
-	prefixLen := maxLen / 3
-	suffixLen := maxLen - prefixLen - 4
+	prefixLen := maxLen / pathPrefixRatio
+	suffixLen := maxLen - prefixLen - pathTruncationOffset
 	if prefixLen < 3 {
 		prefixLen = 3
 	}
