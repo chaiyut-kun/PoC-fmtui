@@ -284,7 +284,7 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		if isBroken {
-			m.err = fmt.Errorf("Symlink target is broken: %s", target)
+			m.err = fmt.Errorf("symlink target is broken: %s", target)
 			break
 		}
 

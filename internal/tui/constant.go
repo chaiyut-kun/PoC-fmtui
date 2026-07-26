@@ -22,7 +22,6 @@ const (
 	BgMagenta = "\033[45m"
 )
 
-const baseDir = "./files"
 const ItemEndSpace = " "
 
 const (

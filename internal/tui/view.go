@@ -492,21 +492,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render bookmark menu if open
@@ -522,21 +508,7 @@ func (m model) View() tea.View {
 			"Press any other key to close"
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render delete bookmark confirmation menu if open
@@ -552,21 +524,7 @@ func (m model) View() tea.View {
 		}
 		dialogContent := fmt.Sprintf("   Remove Bookmark?\n\nRemove bookmark for %q?\n\n   [y] Yes      [n] No", bookmarkName)
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render delete menu if open
@@ -582,21 +540,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render permission menu if open
@@ -611,21 +555,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render open menu if open
@@ -643,21 +573,7 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render full help menu if open
@@ -695,21 +611,7 @@ func (m model) View() tea.View {
 			"          Press ` or ESC to close"
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render Metadata Inspector dialog if open
@@ -740,21 +642,7 @@ func (m model) View() tea.View {
 			meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, meta.MimeOrType, symlinkLine)
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 2
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 2)
 	}
 
 	// Render Quick Find overlay
@@ -848,21 +736,7 @@ func (m model) View() tea.View {
 			Width(dialogW)
 
 		dialog := dialogStyle.Render(dialogContent)
-
-		dialogHeight := lipgloss.Height(dialog)
-		dialogWidth := lipgloss.Width(dialog)
-		startRow := (height - dialogHeight) / 3 // upper-third, like Notion
-		startCol := (width - dialogWidth) / 2
-
-		bgLines := strings.Split(content, "\n")
-		fgLines := strings.Split(dialog, "\n")
-		for r, fgLine := range fgLines {
-			row := startRow + r
-			if row >= 0 && row < len(bgLines) {
-				bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
-			}
-		}
-		content = strings.Join(bgLines, "\n")
+		content = overlayDialog(content, dialog, width, height, 3)
 	}
 
 	v := tea.NewView(content)
@@ -899,4 +773,23 @@ func shrinkPath(path string, maxLen int) string {
 		return path
 	}
 	return path[:prefixLen] + "..." + path[len(path)-suffixLen:]
+}
+
+// overlayDialog centers a foreground dialog string and overlays it onto the background string.
+func overlayDialog(bg string, fg string, width int, height int, yDivisor int) string {
+	const centerDivisor = 2
+	dialogHeight := lipgloss.Height(fg)
+	dialogWidth := lipgloss.Width(fg)
+	startRow := (height - dialogHeight) / yDivisor
+	startCol := (width - dialogWidth) / centerDivisor
+
+	bgLines := strings.Split(bg, "\n")
+	fgLines := strings.Split(fg, "\n")
+	for r, fgLine := range fgLines {
+		row := startRow + r
+		if row >= 0 && row < len(bgLines) {
+			bgLines[row] = overlayLine(bgLines[row], fgLine, startCol)
+		}
+	}
+	return strings.Join(bgLines, "\n")
 }

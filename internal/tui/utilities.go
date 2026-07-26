@@ -2,13 +2,11 @@ package tui
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -104,7 +102,6 @@ func generateDirectoryStructure(root string, showHidden bool) string {
 }
 
 func findAbsPath(dir string, fileName string) string {
-
 	dir, err := filepath.Abs(dir)
 	if err != nil {
 		return ""
@@ -119,83 +116,10 @@ func findAbsPath(dir string, fileName string) string {
 
 func isDir(dir, name string) bool {
 	info, err := os.Stat(filepath.Join(dir, name))
-
 	if err != nil {
 		return false
 	}
 	return info.IsDir()
-}
-
-func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
-	t := m.curTab()
-	t.currentDir = changeDir
-	t.filesPath = t.filesPath[:0]
-	t.filteredFiles = nil
-	m.searchActive = false
-	m.searchText = ""
-	m.searchCursor = 0
-	for _, entry := range entries {
-		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		t.filesPath = append(t.filesPath, entry.Name())
-	}
-
-	t.cursor = 0
-	t.scrollOffset = 0
-	t.previewScrollOffset = 0
-	m.selected = make(map[int]struct{})
-}
-
-func (m *model) reloadCurrentDir() {
-	m.refreshAllTabs()
-	m.selected = make(map[int]struct{})
-}
-
-func (m *model) refreshAllTabs() {
-	for i := range m.tabs {
-		t := &m.tabs[i]
-		entries, err := os.ReadDir(t.currentDir)
-		if err != nil {
-			continue
-		}
-
-		var oldCursorFile string
-		if t.cursor >= 0 && t.cursor < len(t.filesPath) {
-			oldCursorFile = t.filesPath[t.cursor]
-		}
-
-		t.filesPath = t.filesPath[:0]
-		t.filteredFiles = nil
-		m.searchActive = false
-		m.searchText = ""
-		m.searchCursor = 0
-		for _, entry := range entries {
-			if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
-				continue
-			}
-			t.filesPath = append(t.filesPath, entry.Name())
-		}
-
-		newCursor := t.cursor
-		if oldCursorFile != "" {
-			for idx, f := range t.filesPath {
-				if f == oldCursorFile {
-					newCursor = idx
-					break
-				}
-			}
-			// If not found (e.g. file was deleted or moved), newCursor stays at the same index
-		}
-
-		t.cursor = newCursor
-		if t.cursor >= len(t.filesPath) {
-			t.cursor = len(t.filesPath) - 1
-		}
-		if t.cursor < 0 {
-			t.cursor = 0
-		}
-	}
 }
 
 func writeTempDirFile(dir string) error {
@@ -230,7 +154,6 @@ func getSymlinkTarget(dir, name string) (target string, isSym bool, isBroken boo
 }
 
 func (m *model) CheckDirFilesExt(list string) (string, string, string) {
-
 	var fgColor string
 	var bgColor string
 	var icon string
@@ -249,7 +172,6 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 	}
 
 	if isDir(t.currentDir, list) {
-
 		if list == ".git" {
 			icon = GitIcon
 			fgColor = White
@@ -259,7 +181,6 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 			fgColor = Blue
 			bgColor = BgBlue
 		}
-
 	} else {
 		ext := filepath.Ext(list)
 		if ext == ".go" {
@@ -440,8 +361,6 @@ func overlayLine(bg string, fg string, startCol int) string {
 	return result.String()
 }
 
-
-
 func getPreviewLines(path string, isFolder bool, showHidden bool) []string {
 	if isFolder {
 		entries, err := os.ReadDir(path)
@@ -489,241 +408,6 @@ func getPreviewLines(path string, isFolder bool, showHidden bool) []string {
 	content := string(buf[:n])
 	lines := strings.Split(content, "\n")
 	return lines
-}
-
-func copyFile(src, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	if _, err = io.Copy(out, in); err != nil {
-		return err
-	}
-
-	info, err := os.Stat(src)
-	if err == nil {
-		_ = os.Chmod(dst, info.Mode())
-	}
-	return nil
-}
-
-func copyDir(src, dst string) error {
-	info, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(dst, info.Mode()); err != nil {
-		return err
-	}
-
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
-
-		if entry.IsDir() {
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := copyFile(srcPath, dstPath); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func copyFileOrDir(src, dst string) error {
-	info, err := os.Stat(src)
-	if err != nil {
-		return err
-	}
-	if info.IsDir() {
-		return copyDir(src, dst)
-	}
-	return copyFile(src, dst)
-}
-
-func moveFileOrDir(src, dst string) error {
-	// Try atomic rename first
-	err := os.Rename(src, dst)
-	if err == nil {
-		return nil
-	}
-
-	info, statErr := os.Stat(src)
-	if statErr != nil {
-		return statErr
-	}
-
-	if info.IsDir() {
-		if copyErr := copyDir(src, dst); copyErr != nil {
-			return copyErr
-		}
-		return os.RemoveAll(src)
-	}
-
-	if copyErr := copyFile(src, dst); copyErr != nil {
-		return copyErr
-	}
-	return os.Remove(src)
-}
-
-func permanentDelete(path string) error {
-	return os.RemoveAll(path)
-}
-
-func normalDelete(path string) (string, error) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	trashDir := filepath.Join(homeDir, ".local", "share", "Trash", "files")
-	if err := os.MkdirAll(trashDir, 0755); err != nil {
-		return "", err
-	}
-
-	baseName := filepath.Base(path)
-	destination := filepath.Join(trashDir, baseName)
-	counter := 1
-	ext := filepath.Ext(baseName)
-	nameWithoutExt := strings.TrimSuffix(baseName, ext)
-
-	for {
-		if _, statErr := os.Stat(destination); os.IsNotExist(statErr) {
-			break
-		}
-		destination = filepath.Join(trashDir, fmt.Sprintf("%s_%d%s", nameWithoutExt, counter, ext))
-		counter++
-	}
-
-	if err := moveFileOrDir(path, destination); err != nil {
-		return "", err
-	}
-
-	return destination, nil
-}
-
-// ponytail: stdlib os.Stat & os.Chmod to toggle executable mode directly
-func toggleExecutable(path string) (oldMode, newMode os.FileMode, err error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return 0, 0, err
-	}
-	oldMode = info.Mode()
-	if oldMode&0111 != 0 {
-		newMode = oldMode &^ 0111
-	} else {
-		newMode = oldMode | 0111
-	}
-	if err := os.Chmod(path, newMode); err != nil {
-		return 0, 0, err
-	}
-	return oldMode, newMode, nil
-}
-
-func (m *model) pushAction(action ActionRecord) {
-	m.undoStack = append(m.undoStack, action)
-	m.redoStack = nil
-}
-
-func (m *model) performUndo() error {
-	if len(m.undoStack) == 0 {
-		return fmt.Errorf("Nothing to undo")
-	}
-
-	lastIdx := len(m.undoStack) - 1
-	action := m.undoStack[lastIdx]
-	m.undoStack = m.undoStack[:lastIdx]
-
-	switch action.Type {
-	case ActionDelete:
-		if action.TrashPath == "" {
-			return fmt.Errorf("Cannot undo permanent delete")
-		}
-		if err := moveFileOrDir(action.TrashPath, action.OriginalPath); err != nil {
-			return err
-		}
-	case ActionCreate:
-		trashPath, err := normalDelete(action.OriginalPath)
-		if err != nil {
-			return err
-		}
-		action.TrashPath = trashPath
-	case ActionRename:
-		if err := moveFileOrDir(action.NewPath, action.OldPath); err != nil {
-			return err
-		}
-	case ActionChmod:
-		if err := os.Chmod(action.OriginalPath, action.OldMode); err != nil {
-			return err
-		}
-	}
-
-	m.redoStack = append(m.redoStack, action)
-	m.reloadCurrentDir()
-	return nil
-}
-
-func (m *model) performRedo() error {
-	if len(m.redoStack) == 0 {
-		return fmt.Errorf("Nothing to redo")
-	}
-
-	lastIdx := len(m.redoStack) - 1
-	action := m.redoStack[lastIdx]
-	m.redoStack = m.redoStack[:lastIdx]
-
-	switch action.Type {
-	case ActionDelete:
-		if err := moveFileOrDir(action.OriginalPath, action.TrashPath); err != nil {
-			return err
-		}
-	case ActionCreate:
-		if action.TrashPath != "" {
-			if err := moveFileOrDir(action.TrashPath, action.OriginalPath); err != nil {
-				return err
-			}
-		} else {
-			if action.IsDir {
-				if err := os.MkdirAll(action.OriginalPath, 0755); err != nil {
-					return err
-				}
-			} else {
-				file, err := os.Create(action.OriginalPath)
-				if err != nil {
-					return err
-				}
-				file.Close()
-			}
-		}
-	case ActionRename:
-		if err := moveFileOrDir(action.OldPath, action.NewPath); err != nil {
-			return err
-		}
-	case ActionChmod:
-		if err := os.Chmod(action.OriginalPath, action.NewMode); err != nil {
-			return err
-		}
-	}
-
-	m.undoStack = append(m.undoStack, action)
-	m.reloadCurrentDir()
-	return nil
 }
 
 type FileMetaInfo struct {
@@ -853,200 +537,4 @@ func truncatePathLeft(path string, maxWidth int) string {
 		return "..."
 	}
 	return "..." + path[len(path)-(maxWidth-3):]
-}
-
-func (m *model) applySearchFilter() {
-	t := m.curTab()
-	if m.searchText == "" {
-		t.filteredFiles = nil
-	} else {
-		query := strings.ToLower(m.searchText)
-		t.filteredFiles = make([]string, 0)
-		for _, name := range t.filesPath {
-			if strings.Contains(strings.ToLower(name), query) {
-				t.filteredFiles = append(t.filteredFiles, name)
-			}
-		}
-	}
-	t.cursor = 0
-	t.scrollOffset = 0
-	m.adjustScroll()
-}
-
-// quickFindNoisy is the set of directory names we never descend into.
-var quickFindNoisy = map[string]bool{
-	// JS / Python
-	"node_modules": true, "__pycache__": true,
-	// VCS
-	".git": true, ".svn": true, ".hg": true,
-	// Go module cache (pkg/mod can be enormous)
-	"pkg": true, "mod": true, "go-workspace": true,
-	// Common build outputs / caches
-	"vendor": true, ".cache": true, "dist": true, "build": true, "target": true,
-	// Editors / Temp / Assets
-	".vscode": true, ".idea": true, "tmp": true, "temp": true,
-}
-
-// isDirOrSymlinkToDir returns true for real directories and symlinks to directories.
-// e.IsDir() returns false for symlinks even when they point to a dir, so we
-// fall back to os.Stat (which follows symlinks) when the entry is a symlink.
-// ponytail: one Stat call per symlink entry; ceiling: EvalSymlinks for cycle detection.
-func isDirOrSymlinkToDir(e os.DirEntry, fullPath string) bool {
-	if e.IsDir() {
-		return true
-	}
-	if e.Type()&os.ModeSymlink == 0 {
-		return false
-	}
-	fi, err := os.Stat(fullPath) // follows the symlink
-	return err == nil && fi.IsDir()
-}
-
-// quickFindRoots returns deduped walk roots: home, /data (if present), and a
-// top-level ancestor of currentDir when it lives outside home.
-// ponytail: /data hardcoded for this machine; ceiling: user-configurable roots.
-func quickFindRoots(home, currentDir string) []string {
-	out := []string{home}
-	// Always probe /data – common external data partition on this machine.
-	if fi, err := os.Stat("/data"); err == nil && fi.IsDir() {
-		out = append(out, "/data")
-	}
-	// If currentDir is inside home or already covered, skip extra climb.
-	if strings.HasPrefix(currentDir, home+string(filepath.Separator)) || currentDir == home {
-		return out
-	}
-	// Climb toward filesystem root, stop one level below "/".
-	dir := currentDir
-	for {
-		parent := filepath.Dir(dir)
-		if parent == dir || parent == "/" {
-			break
-		}
-		dir = parent
-	}
-	// Add dir only if it's not already in out.
-	if dir != home && dir != "/" {
-		for _, r := range out {
-			if r == dir {
-				return out
-			}
-		}
-		out = append(out, dir)
-	}
-	return out
-}
-
-// buildQuickFindResults returns the top-10 best-matching directories for query.
-// Bookmarks first, then walks home + currentDir ancestor up to depth 6.
-// Matches on basename only; ranked: exact(3) > prefix(2) > contains(1).
-// ponytail: sync walk, depth 6, fixed roots; ceiling: async walk + pre-built index.
-func (m model) buildQuickFindResults(query string) []ShortcutEntry {
-	q := strings.ToLower(query)
-
-	// 1. Bookmarks first – match basename
-	var results []ShortcutEntry
-	for _, b := range m.bookmarks {
-		if q == "" || strings.Contains(strings.ToLower(b.Name), q) {
-			results = append(results, b)
-		}
-	}
-	if q == "" {
-		return results
-	}
-
-	// 2. Walk roots, collect all basename matches with a relevance score.
-	home, _ := os.UserHomeDir()
-	roots := quickFindRoots(home, m.tabs[m.activeTab].currentDir)
-	seen := make(map[string]bool, len(results))
-	for _, r := range results {
-		seen[r.Path] = true
-	}
-
-	type scored struct {
-		entry ShortcutEntry
-		score int
-	}
-	var candidates []scored
-
-	var walk func(dir string, depth int)
-	walk = func(dir string, depth int) {
-		if depth > 6 {
-			return
-		}
-		entries, err := os.ReadDir(dir)
-		if err != nil {
-			return
-		}
-		for _, e := range entries {
-			name := e.Name()
-			full := filepath.Join(dir, name)
-			isDir := isDirOrSymlinkToDir(e, full)
-
-			if isDir {
-				// Skip hidden directories to protect search performance
-				if strings.HasPrefix(name, ".") || quickFindNoisy[name] {
-					continue
-				}
-				walk(full, depth+1)
-			} else {
-				// For files, skip noisy ones. Skip hidden files unless they are whitelisted.
-				if quickFindNoisy[name] {
-					continue
-				}
-				if strings.HasPrefix(name, ".") {
-					allowed := false
-					for _, allowedFile := range m.config.AllowedHiddenFiles {
-						if name == allowedFile {
-							allowed = true
-							break
-						}
-					}
-					if !allowed {
-						continue
-					}
-				}
-			}
-
-			lname := strings.ToLower(name)
-			score := 0
-			switch {
-			case lname == q:
-				score = 3
-			case strings.HasPrefix(lname, q):
-				score = 2
-			case strings.Contains(lname, q):
-				score = 1
-			}
-			if score > 0 && !seen[full] {
-				icon := FileIcon
-				if isDir {
-					icon = DirIcon
-				}
-				candidates = append(candidates, scored{
-					entry: ShortcutEntry{Name: name, Path: full, Icon: icon},
-					score: score,
-				})
-				seen[full] = true
-			}
-		}
-	}
-
-	for _, root := range roots {
-		walk(root, 0)
-	}
-
-	// 3. Sort by score descending; stable preserves walk order within same score.
-	sort.SliceStable(candidates, func(i, j int) bool {
-		return candidates[i].score > candidates[j].score
-	})
-
-	// 4. Append top 10 total (bookmarks already in results).
-	const maxResults = 10
-	for _, c := range candidates {
-		if len(results) >= maxResults {
-			break
-		}
-		results = append(results, c.entry)
-	}
-	return results
 }

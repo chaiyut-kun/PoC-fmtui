@@ -10,6 +10,8 @@ import (
 	"github.com/atotto/clipboard"
 )
 
+const baseDir = "./files"
+
 func TestFindAbsPath(t *testing.T) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -1059,14 +1061,14 @@ func TestAsyncCopyFileContent(t *testing.T) {
 	m.curTab().cursor = 0
 
 	// Open copy menu
-	updatedModel, cmd := m.Update(tea.KeyPressMsg{Text: "y"})
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "y"})
 	m = updatedModel.(model)
 	if !m.copyMenuOpen {
 		t.Fatalf("Expected copy menu to be open")
 	}
 
 	// Choose copy content
-	updatedModel, cmd = m.Update(tea.KeyPressMsg{Text: "c"})
+	updatedModel, cmd := m.Update(tea.KeyPressMsg{Text: "c"})
 	m = updatedModel.(model)
 	if m.copyMenuOpen {
 		t.Errorf("Expected copy menu to close after selection")
@@ -1114,7 +1116,7 @@ func TestAsyncCopyFileContent(t *testing.T) {
 	m.curTab().cursor = 0
 
 	// Open copy menu
-	updatedModel, cmd = m.Update(tea.KeyPressMsg{Text: "y"})
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "y"})
 	m = updatedModel.(model)
 	// Choose copy content
 	updatedModel, cmd = m.Update(tea.KeyPressMsg{Text: "c"})
