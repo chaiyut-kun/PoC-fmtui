@@ -36,16 +36,28 @@ func (m model) handleShortcutKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.deleteBookmarkConfirmOpen = true
 			}
 		case "up", "k":
-			if m.shortcutCursor > 0 {
-				m.shortcutCursor--
+			limit := len(m.shortcuts) - 1
+			if m.shortcutTab == 1 {
+				limit = len(m.bookmarks) - 1
+			}
+			if limit > 0 {
+				if m.shortcutCursor > 0 {
+					m.shortcutCursor--
+				} else {
+					m.shortcutCursor = limit
+				}
 			}
 		case "down", "j":
 			limit := len(m.shortcuts) - 1
 			if m.shortcutTab == 1 {
 				limit = len(m.bookmarks) - 1
 			}
-			if m.shortcutCursor < limit {
-				m.shortcutCursor++
+			if limit > 0 {
+				if m.shortcutCursor < limit {
+					m.shortcutCursor++
+				} else {
+					m.shortcutCursor = 0
+				}
 			}
 		case "[":
 			m.shortcutTab = 0

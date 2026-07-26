@@ -886,6 +886,40 @@ func TestShortcutPaneAction(t *testing.T) {
 	}
 }
 
+func TestShortcutCircularNavigation(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	m := InitialModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+
+	// Enable shortcut pane and focus it
+	m.shortcutPaneOpen = true
+	m.activePane = 0
+	m.shortcutCursor = 0
+
+	// Check total shortcuts
+	limit := len(m.shortcuts) - 1
+	if limit <= 0 {
+		t.Skip("Not enough default shortcuts to test navigation")
+	}
+
+	// 1. Press "up" key at top (index 0) -> should wrap to the bottom (limit)
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "up"})
+	m = updatedModel.(model)
+	if m.shortcutCursor != limit {
+		t.Errorf("Expected shortcutCursor to wrap to %d, got %d", limit, m.shortcutCursor)
+	}
+
+	// 2. Press "down" key at bottom (limit) -> should wrap to the top (0)
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "down"})
+	m = updatedModel.(model)
+	if m.shortcutCursor != 0 {
+		t.Errorf("Expected shortcutCursor to wrap to 0, got %d", m.shortcutCursor)
+	}
+}
+
 func TestBookmarkActionsAndSwitching(t *testing.T) {
 	tempHome := t.TempDir()
 	t.Setenv("HOME", tempHome)
