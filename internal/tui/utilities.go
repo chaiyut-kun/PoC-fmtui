@@ -399,7 +399,7 @@ func getPreviewLines(path string, isFolder bool, showHidden bool) []string {
 	}
 
 	// Binary check
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if buf[i] == 0 {
 			return []string{"Binary File [No Preview]"}
 		}

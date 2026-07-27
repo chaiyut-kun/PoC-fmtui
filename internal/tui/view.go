@@ -75,10 +75,7 @@ func (m model) View() tea.View {
 	}
 	var sLeftWidth int
 	if m.shortcutPaneOpen {
-		sLeftWidth = sWidth / openShortcutPaneRatio
-		if sLeftWidth < minLeftPaneWidth {
-			sLeftWidth = minLeftPaneWidth
-		}
+		sLeftWidth = max(sWidth/openShortcutPaneRatio, minLeftPaneWidth)
 	} else {
 		sAvailableWidth := sWidth - sShortcutWidth
 		sLeftWidth = (sAvailableWidth * leftPaneRatioNumerator) / leftPaneRatioDenominator
@@ -209,22 +206,13 @@ func (m model) View() tea.View {
 	// Calculate shortcut pane width
 	shortcutWidth := 0
 	if m.shortcutPaneOpen {
-		shortcutWidth = width / shortcutWidthRatio
-		if shortcutWidth < minShortcutWidth {
-			shortcutWidth = minShortcutWidth
-		}
+		shortcutWidth = max(width/shortcutWidthRatio, minShortcutWidth)
 	}
 
 	var leftWidth, rightWidth int
 	if m.shortcutPaneOpen {
-		leftWidth = width / openShortcutPaneRatio
-		if leftWidth < minLeftPaneWidth {
-			leftWidth = minLeftPaneWidth
-		}
-		rightWidth = width - shortcutWidth - leftWidth
-		if rightWidth < minLeftPaneWidth {
-			rightWidth = minLeftPaneWidth
-		}
+		leftWidth = max(width/openShortcutPaneRatio, minLeftPaneWidth)
+		rightWidth = max(width-shortcutWidth-leftWidth, minLeftPaneWidth)
 	} else {
 		availableWidth := width - shortcutWidth
 		leftWidth = (availableWidth * leftPaneRatioNumerator) / leftPaneRatioDenominator
@@ -636,10 +624,7 @@ func (m model) View() tea.View {
 			dialogW = quickSearchHalfWidth
 		}
 
-		maxResults := quickSearchMaxResultDefault
-		if maxResults > height-8 {
-			maxResults = height - 8
-		}
+		maxResults := min(quickSearchMaxResultDefault, height-8)
 		if maxResults < 5 {
 			maxResults = 5
 		}
