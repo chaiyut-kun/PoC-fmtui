@@ -153,151 +153,114 @@ func getSymlinkTarget(dir, name string) (target string, isSym bool, isBroken boo
 	return "", false, false
 }
 
-func (m *model) CheckDirFilesExt(list string) (string, string, string) {
-	var fgColor string
-	var bgColor string
-	var icon string
+type fileStyle struct {
+	icon    string
+	fgColor string
+	bgColor string
+}
 
+var exactFileStyles = map[string]fileStyle{
+	"go.mod":              {GoMasCot, Cyan, BgCyan},
+	"go.sum":              {GoMasCot, Cyan, BgCyan},
+	"go.work":             {GoMasCot, Cyan, BgCyan},
+	"Makefile":            {MakeIcon, Yellow, BgYellow},
+	".gitignore":          {GitIgnoreIcon, Gray, GrayHighlight},
+	"Dockerfile":          {DockerFileIcon, Blue, BgBlue},
+	"docker-compose.yml":  {DockerFileIcon, Blue, BgBlue},
+	"docker-compose.yaml": {DockerFileIcon, Blue, BgBlue},
+}
+
+var extStyles = map[string]fileStyle{
+	".go":      {GoExt, Cyan, BgCyan},
+	".js":      {JsIcon, Yellow, BgYellow},
+	".py":      {PyIcon, Cyan, BgCyan},
+	".sh":      {BashIcon, Green, BgGreen},
+	".bash":    {BashIcon, Green, BgGreen},
+	".zsh":     {BashIcon, Green, BgGreen},
+	".md":      {MdIcon, Magenta, BgYellow},
+	".pdf":     {PdfIcon, Red, BgRed},
+	".json":    {JsonIcon, Yellow, BgYellow},
+	".ts":      {TsIcon, Blue, BgBlue},
+	".tsx":     {TsIcon, Blue, BgBlue},
+	".pt":      {PtIcon, Red, BgRed},
+	".pth":     {PtIcon, Red, BgRed},
+	".java":    {JavaIcon, Red, BgRed},
+	".jar":     {JavaIcon, Red, BgRed},
+	".css":     {CssIcon, Blue, BgBlue},
+	".scss":    {CssIcon, Blue, BgBlue},
+	".sass":    {CssIcon, Blue, BgBlue},
+	".less":    {CssIcon, Blue, BgBlue},
+	".html":    {HtmlIcon, Red, BgRed},
+	".htm":     {HtmlIcon, Red, BgRed},
+	".vue":     {VueIcon, Green, BgGreen},
+	".db":      {SqliteIcon, Yellow, BgYellow},
+	".sqlite":  {SqliteIcon, Yellow, BgYellow},
+	".sqlite3": {SqliteIcon, Yellow, BgYellow},
+	".sql":     {SqliteIcon, Yellow, BgYellow},
+	".txt":     {TextIcon, Gray, GrayHighlight},
+	".log":     {TextIcon, Gray, GrayHighlight},
+	".env":     {TextIcon, Gray, GrayHighlight},
+	".xls":     {XlsIcon, Green, BgGreen},
+	".xlsx":    {XlsIcon, Green, BgGreen},
+	".doc":     {DocsIcon, Blue, BgBlue},
+	".docx":    {DocsIcon, Blue, BgBlue},
+	".csv":     {CsvIcon, Green, BgGreen},
+	".ppt":     {PptxIcon, Red, BgRed},
+	".pptx":    {PptxIcon, Red, BgRed},
+	".zip":     {CompressedIcon, Yellow, BgYellow},
+	".tar":     {CompressedIcon, Yellow, BgYellow},
+	".gz":      {CompressedIcon, Yellow, BgYellow},
+	".rar":     {CompressedIcon, Yellow, BgYellow},
+	".7z":      {CompressedIcon, Yellow, BgYellow},
+	".bz2":     {CompressedIcon, Yellow, BgYellow},
+	".xz":      {CompressedIcon, Yellow, BgYellow},
+	".png":     {ImageIcon, Magenta, BgMagenta},
+	".jpg":     {ImageIcon, Magenta, BgMagenta},
+	".jpeg":    {ImageIcon, Magenta, BgMagenta},
+	".gif":     {ImageIcon, Magenta, BgMagenta},
+	".bmp":     {ImageIcon, Magenta, BgMagenta},
+	".svg":     {ImageIcon, Magenta, BgMagenta},
+	".webp":    {ImageIcon, Magenta, BgMagenta},
+	".ico":     {ImageIcon, Magenta, BgMagenta},
+	".mp4":     {VdoIcon, Magenta, BgMagenta},
+	".avi":     {VdoIcon, Magenta, BgMagenta},
+	".mkv":     {VdoIcon, Magenta, BgMagenta},
+	".mov":     {VdoIcon, Magenta, BgMagenta},
+	".webm":    {VdoIcon, Magenta, BgMagenta},
+	".mp3":     {AudioIcon, Cyan, BgCyan},
+	".wav":     {AudioIcon, Cyan, BgCyan},
+	".flac":    {AudioIcon, Cyan, BgCyan},
+	".ogg":     {AudioIcon, Cyan, BgCyan},
+	".aac":     {AudioIcon, Cyan, BgCyan},
+	".m4a":     {AudioIcon, Cyan, BgCyan},
+}
+
+func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 	t := m.curTab()
 	if _, isSym, isBroken := getSymlinkTarget(t.currentDir, list); isSym {
-		icon = SymlinkIcon
 		if isBroken {
-			fgColor = Red
-			bgColor = BgRed
-		} else {
-			fgColor = Cyan
-			bgColor = BgCyan
+			return SymlinkIcon, Red, BgRed
 		}
-		return icon, fgColor, bgColor
+		return SymlinkIcon, Cyan, BgCyan
 	}
 
 	if isDir(t.currentDir, list) {
 		if list == ".git" {
-			icon = GitIcon
-			fgColor = White
-			bgColor = BgWhite
-		} else {
-			icon = DirIcon
-			fgColor = Blue
-			bgColor = BgBlue
+			return GitIcon, White, BgWhite
 		}
-	} else {
-		ext := filepath.Ext(list)
-		if ext == ".go" {
-			icon = GoExt
-			fgColor = Cyan
-			bgColor = BgCyan
-		} else if ext == ".js" {
-			icon = JsIcon
-			fgColor = Yellow
-			bgColor = BgYellow
-		} else if ext == ".py" {
-			icon = PyIcon
-			fgColor = Cyan
-			bgColor = BgCyan
-		} else if ext == ".sh" || ext == ".bash" || ext == ".zsh" {
-			icon = BashIcon
-			fgColor = Green
-			bgColor = BgGreen
-		} else if list == "go.mod" || list == "go.sum" || list == "go.work" {
-			icon = GoMasCot
-			fgColor = Cyan
-			bgColor = BgCyan
-		} else if ext == ".md" {
-			icon = MdIcon
-			fgColor = Magenta
-			bgColor = BgYellow
-		} else if ext == ".pdf" {
-			icon = PdfIcon
-			fgColor = Red
-			bgColor = BgRed
-		} else if ext == ".json" {
-			icon = JsonIcon
-			fgColor = Yellow
-			bgColor = BgYellow
-		} else if list == "Makefile" {
-			icon = MakeIcon
-			fgColor = Yellow
-			bgColor = BgYellow
-		} else if list == ".gitignore" {
-			icon = GitIgnoreIcon
-			fgColor = Gray
-			bgColor = GrayHighlight
-		} else if list == "Dockerfile" || list == "docker-compose.yml" || list == "docker-compose.yaml" {
-			icon = DockerFileIcon
-			fgColor = Blue
-			bgColor = BgBlue
-		} else if ext == ".ts" || ext == ".tsx" {
-			icon = TsIcon
-			fgColor = Blue
-			bgColor = BgBlue
-		} else if ext == ".pt" || ext == ".pth" {
-			icon = PtIcon
-			fgColor = Red
-			bgColor = BgRed
-		} else if ext == ".java" || ext == ".jar" {
-			icon = JavaIcon
-			fgColor = Red
-			bgColor = BgRed
-		} else if ext == ".css" || ext == ".scss" || ext == ".sass" || ext == ".less" {
-			icon = CssIcon
-			fgColor = Blue
-			bgColor = BgBlue
-		} else if ext == ".html" || ext == ".htm" {
-			icon = HtmlIcon
-			fgColor = Red
-			bgColor = BgRed
-		} else if ext == ".vue" {
-			icon = VueIcon
-			fgColor = Green
-			bgColor = BgGreen
-		} else if ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" || ext == ".sql" {
-			icon = SqliteIcon
-			fgColor = Yellow
-			bgColor = BgYellow
-		} else if ext == ".txt" || ext == ".log" || ext == ".env" {
-			icon = TextIcon
-			fgColor = Gray
-			bgColor = GrayHighlight
-		} else if ext == ".xls" || ext == ".xlsx" {
-			icon = XlsIcon
-			fgColor = Green
-			bgColor = BgGreen
-		} else if ext == ".doc" || ext == ".docx" {
-			icon = DocsIcon
-			fgColor = Blue
-			bgColor = BgBlue
-		} else if ext == ".csv" {
-			icon = CsvIcon
-			fgColor = Green
-			bgColor = BgGreen
-		} else if ext == ".ppt" || ext == ".pptx" {
-			icon = PptxIcon
-			fgColor = Red
-			bgColor = BgRed
-		} else if ext == ".zip" || ext == ".tar" || ext == ".gz" || ext == ".rar" || ext == ".7z" || ext == ".bz2" || ext == ".xz" {
-			icon = CompressedIcon
-			fgColor = Yellow
-			bgColor = BgYellow
-		} else if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".svg" || ext == ".webp" || ext == ".ico" {
-			icon = ImageIcon
-			fgColor = Magenta
-			bgColor = BgMagenta
-		} else if ext == ".mp4" || ext == ".avi" || ext == ".mkv" || ext == ".mov" || ext == ".webm" {
-			icon = VdoIcon
-			fgColor = Magenta
-			bgColor = BgMagenta
-		} else if ext == ".mp3" || ext == ".wav" || ext == ".flac" || ext == ".ogg" || ext == ".aac" || ext == ".m4a" {
-			icon = AudioIcon
-			fgColor = Cyan
-			bgColor = BgCyan
-		} else {
-			icon = FileIcon
-			fgColor = Reset
-			bgColor = GrayHighlight
-		}
+		return DirIcon, Blue, BgBlue
 	}
-	return icon, fgColor, bgColor
+
+	if style, ok := exactFileStyles[list]; ok {
+		return style.icon, style.fgColor, style.bgColor
+	}
+
+	ext := filepath.Ext(list)
+	if style, ok := extStyles[ext]; ok {
+		return style.icon, style.fgColor, style.bgColor
+	}
+
+	return FileIcon, Reset, GrayHighlight
 }
 
 func overlayLine(bg string, fg string, startCol int) string {
