@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -115,33 +115,10 @@ func (m model) handleSearchKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.adjustScroll()
 		case "enter":
 			m.searchActive = false
-		case "backspace":
-			runes := []rune(m.searchText)
-			if m.searchCursor > 0 {
-				runes = append(runes[:m.searchCursor-1], runes[m.searchCursor:]...)
-				m.searchCursor--
-				m.searchText = string(runes)
-				m.applySearchFilter()
-			}
-		case "left":
-			if m.searchCursor > 0 {
-				m.searchCursor--
-			}
-		case "right":
-			if m.searchCursor < len([]rune(m.searchText)) {
-				m.searchCursor++
-			}
-		case "home":
-			m.searchCursor = 0
-		case "end":
-			m.searchCursor = len([]rune(m.searchText))
 		default:
-			char := msg.String()
-			if len(char) == 1 || (len(char) > 1 && !strings.HasPrefix(char, "ctrl+")) {
-				runes := []rune(m.searchText)
-				runes = append(runes[:m.searchCursor], append([]rune(char), runes[m.searchCursor:]...)...)
-				m.searchCursor += len([]rune(char))
-				m.searchText = string(runes)
+			oldText := m.searchText
+			m.searchText, m.searchCursor = handleTextEdit(msg.String(), m.searchText, m.searchCursor)
+			if m.searchText != oldText {
 				m.applySearchFilter()
 			}
 		}
@@ -217,33 +194,8 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.inputText = ""
 			m.inputCursor = 0
 			m.isRenaming = false
-		case "left":
-			if m.inputCursor > 0 {
-				m.inputCursor--
-			}
-		case "right":
-			if m.inputCursor < len([]rune(m.inputText)) {
-				m.inputCursor++
-			}
-		case "home":
-			m.inputCursor = 0
-		case "end":
-			m.inputCursor = len([]rune(m.inputText))
-		case "backspace":
-			runes := []rune(m.inputText)
-			if m.inputCursor > 0 {
-				runes = append(runes[:m.inputCursor-1], runes[m.inputCursor:]...)
-				m.inputText = string(runes)
-				m.inputCursor--
-			}
 		default:
-			r := []rune(msg.String())
-			if len(r) == 1 {
-				runes := []rune(m.inputText)
-				runes = append(runes[:m.inputCursor], append([]rune{r[0]}, runes[m.inputCursor:]...)...)
-				m.inputText = string(runes)
-				m.inputCursor++
-			}
+			m.inputText, m.inputCursor = handleTextEdit(msg.String(), m.inputText, m.inputCursor)
 		}
 		return m, nil
 	}
@@ -275,6 +227,61 @@ func handleTextEdit(key, text string, cursor int) (string, int) {
 			text = string(runes)
 			cursor--
 		}
+	case "alt+left", "ctrl+left", "alt+b":
+		if cursor > 0 {
+			newCursor := cursor - 1
+			for newCursor >= 0 && unicode.IsSpace(runes[newCursor]) {
+				newCursor--
+			}
+			for newCursor >= 0 && !unicode.IsSpace(runes[newCursor]) {
+				newCursor--
+			}
+			cursor = newCursor + 1
+		}
+	case "alt+right", "ctrl+right", "alt+f":
+		if cursor < len(runes) {
+			newCursor := cursor
+			for newCursor < len(runes) && unicode.IsSpace(runes[newCursor]) {
+				newCursor++
+			}
+			for newCursor < len(runes) && !unicode.IsSpace(runes[newCursor]) {
+				newCursor++
+			}
+			cursor = newCursor
+		}
+	case "ctrl+w", "alt+backspace", "ctrl+backspace":
+		if cursor > 0 {
+			newCursor := cursor - 1
+			for newCursor >= 0 && unicode.IsSpace(runes[newCursor]) {
+				newCursor--
+			}
+			for newCursor >= 0 && !unicode.IsSpace(runes[newCursor]) {
+				newCursor--
+			}
+			newCursor++
+			runes = append(runes[:newCursor], runes[cursor:]...)
+			text = string(runes)
+			cursor = newCursor
+		}
+	case "alt+delete", "ctrl+delete":
+		if cursor < len(runes) {
+			newCursor := cursor
+			for newCursor < len(runes) && unicode.IsSpace(runes[newCursor]) {
+				newCursor++
+			}
+			for newCursor < len(runes) && !unicode.IsSpace(runes[newCursor]) {
+				newCursor++
+			}
+			runes = append(runes[:cursor], runes[newCursor:]...)
+			text = string(runes)
+		}
+	case "ctrl+u":
+		runes = runes[cursor:]
+		text = string(runes)
+		cursor = 0
+	case "ctrl+k":
+		runes = runes[:cursor]
+		text = string(runes)
 	default:
 		r := []rune(key)
 		if len(r) == 1 {
