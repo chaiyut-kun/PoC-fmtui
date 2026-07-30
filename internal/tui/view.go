@@ -40,11 +40,7 @@ const (
 	minWidthForFullTabs = 27
 
 	shortcutPathPadding = 4
-	copyJobHeightOffset = 4
-	minProgressWidth    = 14
-	progressLabelOffset = 25
 	minBarWidth         = 5
-	progressPaneHeight  = 2
 
 	dialogWidthPadding     = 8
 	shortcutNameFieldWidth = 25
@@ -141,7 +137,7 @@ func (m model) View() tea.View {
 		}
 		selectMarker := " "
 		if _, ok := m.selected[i]; ok {
-			selectMarker = Yellow("*")
+			selectMarker = Yellow(Marker)
 		}
 
 		if t.cursor == i {
@@ -149,7 +145,7 @@ func (m model) View() tea.View {
 			sb.WriteString(bg(Black(rowText)) + "\n")
 		} else {
 			rowText := fmt.Sprintf("%s%s %s %s%s", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
-			sb.WriteString(" " + bg(fg(rowText)) + "\n")
+			sb.WriteString(" " + fg(rowText) + "\n")
 		}
 	}
 
@@ -220,21 +216,21 @@ func (m model) View() tea.View {
 		rightWidth = availableWidth - leftWidth
 	}
 
-	leftBorderColor := "#555555"
-	rightBorderColor := "#555555"
-	shortcutBorderColor := "#555555"
+	leftBorderColor := colorGray
+	rightBorderColor := colorGray
+	shortcutBorderColor := colorGray
 	if m.shortcutPaneOpen {
 		if m.activePane == 0 {
-			shortcutBorderColor = "#5555FF"
+			shortcutBorderColor = colorBlue
 		} else {
-			shortcutBorderColor = "#FFFF55"
+			shortcutBorderColor = colorYellow
 		}
 	}
 	if m.activePane == 1 {
-		leftBorderColor = "#5555FF"
+		leftBorderColor = colorBlue
 	}
 	if m.activePane == 2 {
-		rightBorderColor = "#5555FF"
+		rightBorderColor = colorBlue
 	}
 
 	// 0. Create shortcut pane (if open)
@@ -288,7 +284,7 @@ func (m model) View() tea.View {
 		shortcutStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(shortcutBorderColor)).
-			Width(shortcutWidth - 2).
+			Width(shortcutWidth).
 			Height(boxHeight - 2)
 
 		shortcutBox = shortcutStyle.Render(shortcutText)

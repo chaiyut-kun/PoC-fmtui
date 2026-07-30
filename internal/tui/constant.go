@@ -32,6 +32,7 @@ const ItemEndSpace = " "
 const (
 	CursorIcon = "▶"
 	SearchIcon = "\ue68f"
+	Marker     = "*"
 
 	DirIcon     = "\uf4d3"
 	FileIcon    = "\uf15b"
