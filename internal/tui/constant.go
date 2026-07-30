@@ -1,25 +1,30 @@
 package tui
 
-const (
-	Reset         = "\033[0m"
-	Red           = "\033[31m"
-	Blue          = "\033[34m"
-	Cyan          = "\033[36m"
-	Magenta       = "\033[35m"
-	Yellow        = "\033[33m"
-	White         = "\033[97m"
-	Green         = "\033[32m"
-	Gray          = "\033[37m"
-	GrayHighlight = "\033[47m"
+import (
+	"fmt"
 
-	Black     = "\033[30m"
-	BgRed     = "\033[41m"
-	BgBlue    = "\033[44m"
-	BgCyan    = "\033[46m"
-	BgYellow  = "\033[43m"
-	BgGreen   = "\033[42m"
-	BgWhite   = "\033[47m"
-	BgMagenta = "\033[45m"
+	"github.com/fatih/color"
+)
+
+var (
+	Plain   = func(a ...any) string { return fmt.Sprint(a...) }
+	Red     = color.New(color.FgRed).SprintFunc()
+	Blue    = color.New(color.FgBlue).SprintFunc()
+	Cyan    = color.New(color.FgCyan).SprintFunc()
+	Magenta = color.New(color.FgMagenta).SprintFunc()
+	Yellow  = color.New(color.FgYellow).SprintFunc()
+	White   = color.New(color.FgWhite).SprintFunc()
+	Green   = color.New(color.FgGreen).SprintFunc()
+	Gray    = color.New(color.FgWhite).SprintFunc() // FgWhite is standard gray on standard terminals
+	Black   = color.New(color.FgBlack).SprintFunc()
+
+	BgRed     = color.New(color.BgRed).SprintFunc()
+	BgBlue    = color.New(color.BgBlue).SprintFunc()
+	BgCyan    = color.New(color.BgCyan).SprintFunc()
+	BgYellow  = color.New(color.BgYellow).SprintFunc()
+	BgGreen   = color.New(color.BgGreen).SprintFunc()
+	BgWhite   = color.New(color.BgWhite).SprintFunc()
+	BgMagenta = color.New(color.BgMagenta).SprintFunc()
 )
 
 const ItemEndSpace = " "

@@ -88,7 +88,7 @@ func (m model) View() tea.View {
 	userPart := fmt.Sprintf(" %s: ", getCurrentUser())
 	maxPathLen := max(sLeftWidth-pathHeaderPadding-len(userPart), minPathLen)
 	displayDir := shrinkPath(t.currentDir, maxPathLen)
-	sb.WriteString(fmt.Sprintf(" %s%s: %s%s\n", Cyan, getCurrentUser(), displayDir, Reset))
+	sb.WriteString(fmt.Sprintf(" %s: %s\n", Cyan(getCurrentUser()), Cyan(displayDir)))
 
 	borderColor := colorGray
 	if m.searchActive {
@@ -110,7 +110,7 @@ func (m model) View() tea.View {
 	} else if m.searchText != "" {
 		boxContent = fmt.Sprintf("%s %s", SearchIcon, m.searchText)
 	} else {
-		boxContent = fmt.Sprintf("%s%s press s to search%s", Gray, SearchIcon, Reset)
+		boxContent = Gray(fmt.Sprintf("%s press s to search", SearchIcon))
 	}
 
 	sb.WriteString(boxStyle.Render(boxContent))
@@ -133,7 +133,7 @@ func (m model) View() tea.View {
 			}
 		}
 
-		icon, fgColor, bgColor := m.CheckDirFilesExt(list)
+		icon, fg, bg := m.CheckDirFilesExt(list)
 
 		cursorSymbol := " "
 		if t.cursor == i {
@@ -141,17 +141,15 @@ func (m model) View() tea.View {
 		}
 		selectMarker := " "
 		if _, ok := m.selected[i]; ok {
-			selectMarker = fmt.Sprintf("%s*%s", Yellow, Reset)
+			selectMarker = Yellow("*")
 		}
 
 		if t.cursor == i {
-			sb.WriteString(fmt.Sprintf("%s%s %s%s %s %s%s%s\n", bgColor, Black, cursorSymbol, selectMarker, icon, displayName, ItemEndSpace, Reset))
+			rowText := fmt.Sprintf("%s %s %s %s%s", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
+			sb.WriteString(bg(Black(rowText)) + "\n")
 		} else {
-			if fgColor == Reset {
-				sb.WriteString(fmt.Sprintf(" %s%s %s %s%s\n", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace))
-			} else {
-				sb.WriteString(fmt.Sprintf(" %s%s %s%s %s%s%s \n", cursorSymbol, selectMarker, fgColor, icon, displayName, ItemEndSpace, Reset))
-			}
+			rowText := fmt.Sprintf("%s%s %s %s%s", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
+			sb.WriteString(" " + bg(fg(rowText)) + "\n")
 		}
 	}
 
@@ -166,8 +164,8 @@ func (m model) View() tea.View {
 	files2 := t.visibleFiles()
 	if len(files2) > 0 && t.cursor >= 0 && t.cursor < len(files2) {
 		meta := getFileMetadataInfo(t.currentDir, files2[t.cursor])
-		sb.WriteString(fmt.Sprintf("%s─%s %s%s | %s | %s | %s%s\n",
-			Gray, Reset, Yellow, meta.SizeStr, meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, Reset))
+		sb.WriteString(fmt.Sprintf("%s %s | %s | %s | %s\n",
+			Gray("─"), Yellow(meta.SizeStr), meta.PermStr, meta.OwnerGroup, meta.ModTimeStr))
 	}
 
 	if m.inputMode {
@@ -259,9 +257,9 @@ func (m model) View() tea.View {
 					// use space for icon gap with cursor
 					cursor = CursorIcon + " "
 				}
-				label := fmt.Sprintf("%s%s  %s%s", cursor, s.Icon, s.Name, Reset)
+				label := fmt.Sprintf("%s%s  %s", cursor, s.Icon, s.Name)
 				if i == m.shortcutCursor {
-					label = fmt.Sprintf("%s%s%s  %s%s", BgCyan, Black, cursor+s.Icon, s.Name, Reset)
+					label = BgCyan(Black(fmt.Sprintf("%s%s  %s", cursor, s.Icon, s.Name)))
 				}
 				shortcutText += label + "\n"
 			}
@@ -283,7 +281,7 @@ func (m model) View() tea.View {
 				} else {
 					shortcutText += "\n"
 				}
-				shortcutText += fmt.Sprintf("%s%s%s\n %s%s%s", Gray, sep, Reset, Yellow, truncatedPath, Reset)
+				shortcutText += fmt.Sprintf("%s\n %s", Gray(sep), Yellow(truncatedPath))
 			}
 		}
 
@@ -507,9 +505,9 @@ func (m model) View() tea.View {
 
 	// Bottom Help & Error Status Bar
 	if m.err != nil {
-		content += fmt.Sprintf("\n%sError: %v%s", Red, m.err, Reset)
+		content += "\n" + Red(fmt.Sprintf("Error: %v", m.err))
 	} else if m.statusMsg != "" {
-		content += fmt.Sprintf("\n%s%s%s", Green, m.statusMsg, Reset)
+		content += "\n" + Green(m.statusMsg)
 	}
 	// content += "\n" + helpText
 	content += "\n"
@@ -696,7 +694,7 @@ func (m model) View() tea.View {
 		var inputLine string
 
 		if m.quickFindSelecting {
-			inputLine = fmt.Sprintf("  %s %s  %s%s", SearchIcon, Gray, m.quickFindText, Reset)
+			inputLine = fmt.Sprintf("  %s   %s", SearchIcon, Gray(m.quickFindText))
 		} else {
 			before := string(runes[:cur])
 			after := string(runes[cur:])
@@ -711,9 +709,9 @@ func (m model) View() tea.View {
 		// Build results list
 		var resultLines []string
 		if len(m.quickFindResults) == 0 && m.quickFindText == "" {
-			resultLines = append(resultLines, fmt.Sprintf("  %sBookmarks are shown here…%s", Gray, Reset))
+			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("Bookmarks are shown here…")))
 		} else if len(m.quickFindResults) == 0 {
-			resultLines = append(resultLines, fmt.Sprintf("  %sNo results%s", Gray, Reset))
+			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("No results")))
 		} else {
 			shown := m.quickFindResults
 			if len(shown) > maxResults {
@@ -735,9 +733,9 @@ func (m model) View() tea.View {
 
 				beautifiedPath := shrinkPath(r.Path, pathMaxLen)
 
-				line := fmt.Sprintf("  %s %s   %s%s%s", icon, namePart, Gray, beautifiedPath, Reset)
+				line := fmt.Sprintf("  %s %s   %s", icon, namePart, Gray(beautifiedPath))
 				if m.quickFindSelecting && i == m.quickFindSelected {
-					line = fmt.Sprintf("%s%s %s %s   %s%s%s", Cyan, CursorIcon, icon, namePart, Gray, beautifiedPath, Reset)
+					line = fmt.Sprintf("%s %s %s   %s", Cyan(CursorIcon), icon, namePart, Gray(beautifiedPath))
 				}
 				resultLines = append(resultLines, line)
 			}
@@ -748,7 +746,7 @@ func (m model) View() tea.View {
 		if m.quickFindSelecting {
 			modeHint = "  tab: toggle input - select • ↑↓/jk: navigate • Enter: jump • Esc: close"
 		}
-		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + fmt.Sprintf("%s%s%s", Gray, modeHint, Reset)
+		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + Gray(modeHint)
 
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).

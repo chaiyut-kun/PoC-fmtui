@@ -155,8 +155,8 @@ func getSymlinkTarget(dir, name string) (target string, isSym bool, isBroken boo
 
 type fileStyle struct {
 	icon    string
-	fgColor string
-	bgColor string
+	fgColor func(...any) string
+	bgColor func(...any) string
 }
 
 var exactFileStyles = map[string]fileStyle{
@@ -164,7 +164,7 @@ var exactFileStyles = map[string]fileStyle{
 	"go.sum":              {GoMasCot, Cyan, BgCyan},
 	"go.work":             {GoMasCot, Cyan, BgCyan},
 	"Makefile":            {MakeIcon, Yellow, BgYellow},
-	".gitignore":          {GitIgnoreIcon, Gray, GrayHighlight},
+	".gitignore":          {GitIgnoreIcon, Gray, Plain},
 	"Dockerfile":          {DockerFileIcon, Blue, BgBlue},
 	"docker-compose.yml":  {DockerFileIcon, Blue, BgBlue},
 	"docker-compose.yaml": {DockerFileIcon, Blue, BgBlue},
@@ -197,9 +197,9 @@ var extStyles = map[string]fileStyle{
 	".sqlite":  {SqliteIcon, Yellow, BgYellow},
 	".sqlite3": {SqliteIcon, Yellow, BgYellow},
 	".sql":     {SqliteIcon, Yellow, BgYellow},
-	".txt":     {TextIcon, Gray, GrayHighlight},
-	".log":     {TextIcon, Gray, GrayHighlight},
-	".env":     {TextIcon, Gray, GrayHighlight},
+	".txt":     {TextIcon, Gray, Plain},
+	".log":     {TextIcon, Gray, Plain},
+	".env":     {TextIcon, Gray, Plain},
 	".xls":     {XlsIcon, Green, BgGreen},
 	".xlsx":    {XlsIcon, Green, BgGreen},
 	".doc":     {DocsIcon, Blue, BgBlue},
@@ -235,7 +235,7 @@ var extStyles = map[string]fileStyle{
 	".m4a":     {AudioIcon, Cyan, BgCyan},
 }
 
-func (m *model) CheckDirFilesExt(list string) (string, string, string) {
+func (m *model) CheckDirFilesExt(list string) (string, func(...any) string, func(...any) string) {
 	t := m.curTab()
 	if _, isSym, isBroken := getSymlinkTarget(t.currentDir, list); isSym {
 		if isBroken {
@@ -260,7 +260,7 @@ func (m *model) CheckDirFilesExt(list string) (string, string, string) {
 		return style.icon, style.fgColor, style.bgColor
 	}
 
-	return FileIcon, Reset, GrayHighlight
+	return FileIcon, Plain, Plain
 }
 
 func overlayLine(bg string, fg string, startCol int) string {
