@@ -98,12 +98,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			shortcutWidth := 0
 			if m.shortcutPaneOpen {
-				shortcutWidth = max(width/4, 14)
+				shortcutWidth = max(width/shortcutWidthRatio, minShortcutWidth)
 			}
 			availableWidth := width - shortcutWidth
-			leftWidth := (availableWidth * 2) / 3
-			if leftWidth < 10 {
-				leftWidth = availableWidth / 2
+			leftWidth := (availableWidth * leftPaneRatioNumerator) / leftPaneRatioDenominator
+			if leftWidth < minLeftPaneWidth {
+				leftWidth = availableWidth / openShortcutPaneRatio
 			}
 
 			if m.shortcutPaneOpen {

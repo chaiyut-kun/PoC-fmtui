@@ -284,7 +284,7 @@ func (m model) View() tea.View {
 		shortcutStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(shortcutBorderColor)).
-			Width(shortcutWidth).
+			Width(shortcutWidth - 2).
 			Height(boxHeight - 2)
 
 		shortcutBox = shortcutStyle.Render(shortcutText)

@@ -65,6 +65,14 @@ func copyDir(src, dst string) error {
 }
 
 func copyFileOrDir(src, dst string) error {
+	absSrc, err := filepath.Abs(src)
+	if err == nil {
+		absDst, err := filepath.Abs(dst)
+		if err == nil && absSrc == absDst {
+			return fmt.Errorf("cannot copy file/directory to itself")
+		}
+	}
+
 	info, err := os.Stat(src)
 	if err != nil {
 		return err
