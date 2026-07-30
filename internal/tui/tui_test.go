@@ -1754,4 +1754,34 @@ func TestUserConfig(t *testing.T) {
 	}
 }
 
+func TestShortcutNavigationKeepPaneOpen(t *testing.T) {
+	tempDir := t.TempDir()
+	err := os.WriteFile(filepath.Join(tempDir, "dummy.txt"), []byte("dummy"), 0644)
+	if err != nil {
+		t.Fatalf("failed to create dummy file: %v", err)
+	}
+
+	m := InitialModel()
+	m.shortcuts = []ShortcutEntry{
+		{Name: "TempDir", Path: tempDir, Icon: DirIcon},
+	}
+	m.shortcutPaneOpen = true
+	m.activePane = 0 // focus shortcuts
+	m.shortcutCursor = 0
+
+	// Navigate using "enter"
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = updatedModel.(model)
+
+	if !m.shortcutPaneOpen {
+		t.Errorf("expected shortcutPaneOpen to remain true after navigation")
+	}
+	if m.activePane != 1 {
+		t.Errorf("expected activePane to switch to 1 (File Explorer), got %d", m.activePane)
+	}
+	if m.curTab().currentDir != tempDir {
+		t.Errorf("expected currentDir to be %q, got %q", tempDir, m.curTab().currentDir)
+	}
+}
+
 

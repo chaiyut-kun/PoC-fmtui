@@ -86,7 +86,6 @@ func (m model) handleShortcutKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				} else {
 					m.reLoadDir(targetDir, entries)
 					m.adjustScroll()
-					m.shortcutPaneOpen = false
 					m.activePane = 1
 					m.statusMsg = fmt.Sprintf("Jumped to %s", targetName)
 				}
