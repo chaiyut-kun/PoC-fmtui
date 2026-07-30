@@ -305,13 +305,8 @@ func (m *model) getMaxVisibleFiles() int {
 		bottomBarLines = 2
 	}
 	boxHeight := max(m.terminalHeight-bottomBarLines, 3)
-	leftHeight := boxHeight - 2 // subtract top+bottom border
-	if m.copyJobActive {
-		leftHeight -= 4 // progress pane height
-		if leftHeight < 3 {
-			leftHeight = 3
-		}
-	}
+	// Subtract 2 for the FM box border, and 5 for the new bottom section (Process & Clipboard)
+	leftHeight := max(boxHeight-2-5, 3)
 	// rows consumed inside the box beyond the file list:
 	//   1 = path header line
 	//   3 = search bar lines (with border)
