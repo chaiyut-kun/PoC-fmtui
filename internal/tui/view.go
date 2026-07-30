@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/fatih/color"
 )
 
 const (
@@ -28,8 +29,8 @@ const (
 	shortcutWidthRatio    = 4
 	openShortcutPaneRatio = 2
 
-	leftPaneRatioNumerator   = 2
-	leftPaneRatioDenominator = 3
+	leftPaneRatioNumerator   = 1
+	leftPaneRatioDenominator = 2
 
 	minPathLen          = 15
 	pathHeaderPadding   = 2
@@ -97,7 +98,6 @@ func (m model) View() tea.View {
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(borderColor)).
-		Padding(0, 1).
 		Width(sLeftWidth - searchBoxPadding) // fit inside the left pane
 
 	var boxContent string
@@ -110,7 +110,7 @@ func (m model) View() tea.View {
 	} else if m.searchText != "" {
 		boxContent = fmt.Sprintf("%s %s", SearchIcon, m.searchText)
 	} else {
-		boxContent = fmt.Sprintf("%s%s press s to search for file or directory%s", Gray, SearchIcon, Reset)
+		boxContent = fmt.Sprintf("%s%s press s to search%s", Gray, SearchIcon, Reset)
 	}
 
 	sb.WriteString(boxStyle.Render(boxContent))
@@ -318,18 +318,17 @@ func (m model) View() tea.View {
 	}
 
 	// 1. Create left box (File Explorer)
-	leftHeight := boxHeight - paneBorderPadding
-	if m.copyJobActive {
-		leftHeight -= copyJobHeightOffset
-		if leftHeight < minBoxHeight {
-			leftHeight = minBoxHeight
-		}
+	bottomSectionHeight := 5
+	explorerHeight := boxHeight - bottomSectionHeight - paneBorderPadding
+	if explorerHeight < minBoxHeight-paneBorderPadding {
+		explorerHeight = minBoxHeight - paneBorderPadding
 	}
+
 	leftStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
 		Width(leftWidth - paneBorderPadding).
-		Height(leftHeight)
+		Height(explorerHeight)
 
 	leftBox := leftStyle.Render(renderedText)
 
@@ -359,28 +358,94 @@ func (m model) View() tea.View {
 		leftBox = strings.Join(leftLines, "\n")
 	}
 
+	// Render process status and clipboard panes at bottom
+	processWidth := leftWidth / 3
+	clipboardWidth := leftWidth - processWidth
+
+	var processContent string
 	if m.copyJobActive {
-		progressWidth := max(leftWidth, minProgressWidth)
+		innerW := max(processWidth-2, 1)
+		percentStr := fmt.Sprintf("%.0f%%", m.copyJobProgress*100)
+		labelAndBracketsLen := 5 + len(percentStr)
+		barW := innerW - labelAndBracketsLen
+		var barStr string
+		if barW > 0 {
+			filledLen := min(int(m.copyJobProgress*float64(barW)), barW)
+			emptyLen := barW - filledLen
+			barStr = fmt.Sprintf(" [%s%s] %s", strings.Repeat("█", filledLen), strings.Repeat("░", emptyLen), percentStr)
+		} else {
+			barStr = fmt.Sprintf(" %s", percentStr)
+		}
 
-		// subtract space for borders and labels
-		barWidth := max(progressWidth-progressLabelOffset, minBarWidth)
-		filledLen := min(int(m.copyJobProgress*float64(barWidth)), barWidth)
-		emptyLen := barWidth - filledLen
-		barStr := strings.Repeat("█", filledLen) + strings.Repeat("░", emptyLen)
-
-		percentStr := fmt.Sprintf("%.1f%%", m.copyJobProgress*100)
-		progressContent := fmt.Sprintf("Copying: %s\n[%s] %s (Esc to cancel)", m.copyJobFileName, barStr, percentStr)
-
-		progressStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
-			Padding(0, 1).
-			Width(progressWidth - paneBorderPadding).
-			Height(progressPaneHeight) // 4 lines total including borders
-
-		progressPane := progressStyle.Render(progressContent)
-		leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, progressPane)
+		fileName := m.copyJobFileName
+		if len(fileName) > innerW-2 {
+			fileName = fileName[:max(0, innerW-5)] + "..."
+		}
+		processContent = fmt.Sprintf("Copying...\n%s\n  %s", barStr, fileName)
+	} else {
+		processContent = "\n  Idle"
 	}
+
+	var clipboardContent string
+	if len(m.stagedPaths) == 0 {
+		clipboardContent = "\n  Empty"
+	} else {
+		innerW := max(clipboardWidth-2, 1)
+		var itemLines []string
+		for i, path := range m.stagedPaths {
+			if i >= 2 {
+				itemLines = append(itemLines, fmt.Sprintf("  ... and %d more", len(m.stagedPaths)-2))
+				break
+			}
+			baseName := filepath.Base(path)
+			if len(baseName) > innerW-4 {
+				baseName = baseName[:max(0, innerW-7)] + "..."
+			}
+			itemLines = append(itemLines, "  - "+baseName)
+		}
+		clipboardContent = strings.Join(itemLines, "\n")
+	}
+
+	processStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(leftBorderColor)).
+		Width(processWidth - paneBorderPadding).
+		Height(bottomSectionHeight - paneBorderPadding)
+
+	clipboardStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(leftBorderColor)).
+		Width(clipboardWidth - paneBorderPadding).
+		Height(bottomSectionHeight - paneBorderPadding)
+
+	processBox := processStyle.Render(processContent)
+	clipboardBox := clipboardStyle.Render(clipboardContent)
+
+	// Add top border labels to the sub-panes
+	processLines := strings.Split(processBox, "\n")
+	if len(processLines) > 0 {
+		processLines[0] = createTopBorder(" Process ", processWidth, leftBorderColor, "")
+		processBox = strings.Join(processLines, "\n")
+	}
+
+	var clipTitle string
+	if len(m.stagedPaths) > 0 {
+		opLabel := "Copy"
+		if m.stagedOp == "move" {
+			opLabel = "Cut"
+		}
+		clipTitle = fmt.Sprintf(" Clipboard (%s) ", opLabel)
+	} else {
+		clipTitle = " Clipboard "
+	}
+	clipboardLines := strings.Split(clipboardBox, "\n")
+	if len(clipboardLines) > 0 {
+		clipboardLines[0] = createTopBorder(clipTitle, clipboardWidth, leftBorderColor, "")
+		clipboardBox = strings.Join(clipboardLines, "\n")
+	}
+
+	bottomPanes := lipgloss.JoinHorizontal(lipgloss.Top, processBox, clipboardBox)
+	leftBox = lipgloss.JoinVertical(lipgloss.Left, leftBox, bottomPanes)
 
 	// 2. Create right box (Previewer)
 	var rightText string
@@ -592,8 +657,8 @@ func (m model) View() tea.View {
 
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
-			Padding(1, 3)
+			BorderForeground(lipgloss.Color(colorGray)). // Cyan border
+			Padding(1, 4)
 
 		symlinkLine := ""
 		if meta.IsSymlink {
@@ -602,15 +667,14 @@ func (m model) View() tea.View {
 
 		dialogContent := fmt.Sprintf("File Metadata Inspector\n\n"+
 			"Name:        %s\n"+
-			"Path:        %s\n"+
-			"Size:        %s (%d bytes)\n"+
+			"Size:        %s\n"+
 			"Permissions: %s\n"+
 			"Owner/Group: %s\n"+
 			"Modified:    %s\n"+
 			"Type:        %s\n"+
 			"%s\n"+
-			"     Press ESC or any key to close",
-			meta.Name, meta.AbsPath, meta.SizeStr, meta.SizeBytes,
+			color.YellowString("Press ESC or any key to close"),
+			meta.Name, meta.SizeStr,
 			meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, meta.MimeOrType, symlinkLine)
 
 		dialog := dialogStyle.Render(dialogContent)
@@ -624,10 +688,7 @@ func (m model) View() tea.View {
 			dialogW = quickSearchHalfWidth
 		}
 
-		maxResults := min(quickSearchMaxResultDefault, height-8)
-		if maxResults < 5 {
-			maxResults = 5
-		}
+		maxResults := max(min(quickSearchMaxResultDefault, height-8), 5)
 
 		// Build input line with cursor
 		runes := []rune(m.quickFindText)

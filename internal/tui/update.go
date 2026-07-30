@@ -45,7 +45,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.WindowSizeMsg:
-		m.terminalHeight = msg.Height
+		// + 1 for fits with terminal height (reduce padding at bottom)
+		m.terminalHeight = msg.Height + 1
 		m.terminalWidth = msg.Width
 		m.adjustScroll()
 		return m, nil
