@@ -90,4 +90,5 @@ const (
 	DefaultYDivisor = 2
 
 	DefaultScreenWidth = 80
+	inputWidth         = 32
 )

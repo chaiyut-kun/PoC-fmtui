@@ -261,6 +261,16 @@ func (m model) isAnyMenuOpen() bool {
 		m.helpMenuOpen || m.metadataInspectorOpen || m.quickFindOpen
 }
 
+func setTextInputStyles(textInput *textinput.Model, placeholder string) {
+	textInput.Prompt = ""
+	textInput.Placeholder = placeholder
+	textInputStyle := textInput.Styles()
+	textInputStyle.Blurred.Placeholder = lipgloss.NewStyle().Foreground(lightGray)
+	textInputStyle.Focused.Placeholder = lipgloss.NewStyle().Foreground(lightGray)
+	textInput.SetWidth(inputWidth)
+	textInput.SetStyles(textInputStyle)
+}
+
 func InitialModel() model {
 	currentDir, _ := os.Getwd()
 	entries, err := os.ReadDir(currentDir)
@@ -279,31 +289,14 @@ func InitialModel() model {
 		filesPath:  files,
 	}
 
-	phStyle := lipgloss.NewStyle().Foreground(lightGray)
-
 	fi := textinput.New()
-	fi.Prompt = ""
-	fi.Placeholder = "Enter filename"
-	fiStyles := fi.Styles()
-	fiStyles.Blurred.Placeholder = phStyle
-	fiStyles.Focused.Placeholder = phStyle
-	fi.SetStyles(fiStyles)
-	
+	setTextInputStyles(&fi, "Enter file / directory name")
+
 	si := textinput.New()
-	si.Prompt = ""
-	si.Placeholder = "Search..."
-	siStyles := si.Styles()
-	siStyles.Blurred.Placeholder = phStyle
-	siStyles.Focused.Placeholder = phStyle
-	si.SetStyles(siStyles)
-	
+	setTextInputStyles(&si, "search file / directory")
+
 	qi := textinput.New()
-	qi.Prompt = ""
-	qi.Placeholder = "Quick find..."
-	qiStyles := qi.Styles()
-	qiStyles.Blurred.Placeholder = phStyle
-	qiStyles.Focused.Placeholder = phStyle
-	qi.SetStyles(qiStyles)
+	setTextInputStyles(&qi, "Find any file / directory")
 
 	return model{
 		tabs:             []TabState{initialTab},
