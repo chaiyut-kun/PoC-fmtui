@@ -164,7 +164,7 @@ var exactFileStyles = map[string]fileStyle{
 	"go.sum":              {GoMasCot, Cyan, BgCyan},
 	"go.work":             {GoMasCot, Cyan, BgCyan},
 	"Makefile":            {MakeIcon, Yellow, BgYellow},
-	".gitignore":          {GitIgnoreIcon, Gray, Plain},
+	".gitignore":          {GitIgnoreIcon, Gray, BgWhite},
 	"Dockerfile":          {DockerFileIcon, Blue, BgBlue},
 	"docker-compose.yml":  {DockerFileIcon, Blue, BgBlue},
 	"docker-compose.yaml": {DockerFileIcon, Blue, BgBlue},
@@ -197,9 +197,9 @@ var extStyles = map[string]fileStyle{
 	".sqlite":  {SqliteIcon, Yellow, BgYellow},
 	".sqlite3": {SqliteIcon, Yellow, BgYellow},
 	".sql":     {SqliteIcon, Yellow, BgYellow},
-	".txt":     {TextIcon, Gray, Plain},
-	".log":     {TextIcon, Gray, Plain},
-	".env":     {TextIcon, Gray, Plain},
+	".txt":     {TextIcon, Gray, BgWhite},
+	".log":     {TextIcon, Gray, BgWhite},
+	".env":     {TextIcon, Gray, BgWhite},
 	".xls":     {XlsIcon, Green, BgGreen},
 	".xlsx":    {XlsIcon, Green, BgGreen},
 	".doc":     {DocsIcon, Blue, BgBlue},
@@ -260,7 +260,7 @@ func (m *model) CheckDirFilesExt(list string) (string, func(...any) string, func
 		return style.icon, style.fgColor, style.bgColor
 	}
 
-	return FileIcon, Plain, Plain
+	return FileIcon, Plain, BgWhite
 }
 
 func overlayLine(bg string, fg string, startCol int) string {

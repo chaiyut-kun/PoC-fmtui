@@ -34,7 +34,7 @@ const (
 
 	minPathLen          = 15
 	pathHeaderPadding   = 2
-	searchBoxPadding    = 6
+	searchBoxPadding    = 2
 	tabBorderOffset     = 4
 	paneBorderPadding   = 2
 	minWidthForFullTabs = 27
@@ -719,11 +719,6 @@ func (m model) View() tea.View {
 			inputLine = fmt.Sprintf("  %s  %s", SearchIcon, m.quickFindInput.View())
 		}
 
-		// Horizontal divider (dialogW - 4 accounts for Padding(1, 2) which takes 4 columns)
-		divider := lipgloss.NewStyle().
-			Foreground(lipgloss.Color(colorCyan)).
-			Render(strings.Repeat("─", dialogW-4))
-
 		// Build results list
 		var resultLines []string
 		if len(m.quickFindResults) == 0 && m.quickFindInput.Value() == "" {
@@ -764,7 +759,7 @@ func (m model) View() tea.View {
 		if m.quickFindSelecting {
 			modeHint = "  tab: toggle input - select • ↑↓/jk: navigate • Enter: jump • Esc: close"
 		}
-		dialogContent := inputLine + "\n" + divider + "\n" + strings.Join(resultLines, "\n") + "\n\n" + Gray(modeHint)
+		dialogContent := inputLine + "\n" + "\n" + strings.Join(resultLines, "\n") + "\n\n" + Gray(modeHint)
 
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
