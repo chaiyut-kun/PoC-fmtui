@@ -2,6 +2,7 @@ files/
 features
 others
 
+
 opencode.sh
 agy.sh
 list2
@@ -10,3 +11,4 @@ list2
 fix_newlines_plan.txt
 
 .agents
+fm

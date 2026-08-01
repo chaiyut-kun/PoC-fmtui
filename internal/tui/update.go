@@ -46,15 +46,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		// + 1 for fits with terminal height (reduce padding at bottom)
-		m.terminalHeight = msg.Height + 1
+		m.terminalHeight = msg.Height
 		m.terminalWidth = msg.Width
 		m.adjustScroll()
 		return m, nil
 
 	case tea.MouseMsg:
-		mEvt := msg.Mouse()
+		mouseEvent := msg.Mouse()
 		t := m.curTab()
-		switch mEvt.Button {
+		switch mouseEvent.Button {
 		case tea.MouseWheelUp:
 			if m.activePane == 0 && m.shortcutPaneOpen {
 				if m.shortcutCursor > 0 {
@@ -94,7 +94,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.MouseLeft:
 			width := m.terminalWidth
 			if width < 20 {
-				width = 80
+				width = DefaultScreenWidth
 			}
 			shortcutWidth := 0
 			if m.shortcutPaneOpen {
@@ -107,15 +107,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if m.shortcutPaneOpen {
-				if mEvt.X < shortcutWidth {
+				if mouseEvent.X < shortcutWidth {
 					m.activePane = 0
-				} else if mEvt.X < shortcutWidth+leftWidth {
+				} else if mouseEvent.X < shortcutWidth+leftWidth {
 					m.activePane = 1
 				} else {
 					m.activePane = 2
 				}
 			} else {
-				if mEvt.X < leftWidth {
+				if mouseEvent.X < leftWidth {
 					m.activePane = 1
 				} else {
 					m.activePane = 2

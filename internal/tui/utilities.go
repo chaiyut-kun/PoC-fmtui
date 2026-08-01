@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var tempDirFile = filepath.Join(os.TempDir(), "fmtui-dir")

@@ -153,11 +153,13 @@ func (m model) View() tea.View {
 	}
 
 	// Metadata bar pinned at bottom inside the border
-	files2 := t.visibleFiles()
-	if len(files2) > 0 && t.cursor >= 0 && t.cursor < len(files2) {
-		meta := getFileMetadataInfo(t.currentDir, files2[t.cursor])
+	metaFiles := t.visibleFiles()
+	if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
+		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
 		sb.WriteString(fmt.Sprintf("%s %s | %s | %s | %s\n",
 			Gray("─"), Yellow(meta.SizeStr), meta.PermStr, meta.OwnerGroup, meta.ModTimeStr))
+	} else {
+		sb.WriteString(Gray(" No file / directory found") + "\n")
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
@@ -171,8 +173,9 @@ func (m model) View() tea.View {
 	if height < minScreenHeight {
 		height = defaultScreenHeight
 	}
-
-	bottomBarLines := 1
+	
+	//prepare for if any error 
+	bottomBarLines := 0
 	if m.err != nil {
 		bottomBarLines = 2
 	}

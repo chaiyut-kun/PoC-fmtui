@@ -321,7 +321,8 @@ func (m model) Init() tea.Cmd {
 // the File Explorer pane. Both adjustScroll and View must use this value so
 // they always agree on the scroll window. // ponytail: single source of truth
 func (m *model) getMaxVisibleFiles() int {
-	bottomBarLines := 1
+	// prepare for if any error
+	bottomBarLines := 0
 	if m.err != nil {
 		bottomBarLines = 2
 	}
@@ -332,11 +333,7 @@ func (m *model) getMaxVisibleFiles() int {
 	//   1 = path header line
 	//   3 = search bar lines (with border)
 	//   1 = metadata bar at bottom
-	//   2 = input prompt lines (only in inputMode)
 	consumed := 5
-	if m.inputMode {
-		consumed += 2
-	}
 	maxVisible := max(leftHeight-consumed, 1)
 	return maxVisible
 }
