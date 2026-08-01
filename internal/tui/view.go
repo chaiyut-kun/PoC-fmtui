@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/fatih/color"
 )
 
@@ -160,8 +160,6 @@ func (m model) View() tea.View {
 			Gray("─"), Yellow(meta.SizeStr), meta.PermStr, meta.OwnerGroup, meta.ModTimeStr))
 	}
 
-
-
 	// Trim trailing newline so lipgloss box height is calculated precisely
 	renderedText := strings.TrimSuffix(sb.String(), "\n")
 
@@ -267,8 +265,8 @@ func (m model) View() tea.View {
 		shortcutStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(shortcutBorderColor)).
-			Width(shortcutWidth - 2).
-			Height(boxHeight - 2)
+			Width(shortcutWidth).
+			Height(boxHeight)
 
 		shortcutBox = shortcutStyle.Render(shortcutText)
 
@@ -296,15 +294,12 @@ func (m model) View() tea.View {
 
 	// 1. Create left box (File Explorer)
 	bottomSectionHeight := 5
-	explorerHeight := boxHeight - bottomSectionHeight - paneBorderPadding
-	if explorerHeight < minBoxHeight-paneBorderPadding {
-		explorerHeight = minBoxHeight - paneBorderPadding
-	}
+	explorerHeight := max(boxHeight-bottomSectionHeight-paneBorderPadding, minBoxHeight-paneBorderPadding)
 
 	leftStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
-		Width(leftWidth - paneBorderPadding).
+		Width(leftWidth).
 		Height(explorerHeight)
 
 	leftBox := leftStyle.Render(renderedText)
@@ -386,14 +381,14 @@ func (m model) View() tea.View {
 	processStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
-		Width(processWidth - paneBorderPadding).
-		Height(bottomSectionHeight - paneBorderPadding)
+		Width(processWidth).
+		Height(bottomSectionHeight)
 
 	clipboardStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(leftBorderColor)).
-		Width(clipboardWidth - paneBorderPadding).
-		Height(bottomSectionHeight - paneBorderPadding)
+		Width(clipboardWidth).
+		Height(bottomSectionHeight)
 
 	processBox := processStyle.Render(processContent)
 	clipboardBox := clipboardStyle.Render(clipboardContent)
@@ -462,8 +457,8 @@ func (m model) View() tea.View {
 	rightStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(rightBorderColor)).
-		Width(rightWidth - paneBorderPadding).
-		Height(boxHeight - paneBorderPadding)
+		Width(rightWidth).
+		Height(boxHeight)
 
 	rightBox := rightStyle.Render(rightText)
 
