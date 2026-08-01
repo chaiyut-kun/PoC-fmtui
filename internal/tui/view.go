@@ -98,13 +98,9 @@ func (m model) View() tea.View {
 
 	var boxContent string
 	if m.searchActive {
-		runes := []rune(m.searchText)
-		cur := min(m.searchCursor, len(runes))
-		before := string(runes[:cur])
-		after := string(runes[cur:])
-		boxContent = fmt.Sprintf("%s %s█%s", SearchIcon, before, after)
-	} else if m.searchText != "" {
-		boxContent = fmt.Sprintf("%s %s", SearchIcon, m.searchText)
+		boxContent = fmt.Sprintf("%s %s", SearchIcon, m.searchInput.View())
+	} else if m.searchInput.Value() != "" {
+		boxContent = fmt.Sprintf("%s %s", SearchIcon, m.searchInput.Value())
 	} else {
 		boxContent = Gray(fmt.Sprintf("%s press s to search", SearchIcon))
 	}
@@ -171,12 +167,7 @@ func (m model) View() tea.View {
 		} else if m.isCreatingDir {
 			prompt = "Create directory"
 		}
-		// ponytail: split at cursor rune index, no extra lib
-		runes := []rune(m.inputText)
-		cur := min(m.inputCursor, len(runes))
-		before := string(runes[:cur])
-		after := string(runes[cur:])
-		sb.WriteString(fmt.Sprintf("%s: %s█%s\n(Enter to confirm, Esc to cancel)\n", prompt, before, after))
+		sb.WriteString(fmt.Sprintf("%s: %s\n(Enter to confirm, Esc to cancel)\n", prompt, m.fileInput.View()))
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
@@ -685,16 +676,12 @@ func (m model) View() tea.View {
 		maxResults := max(min(quickSearchMaxResultDefault, height-8), 5)
 
 		// Build input line with cursor
-		runes := []rune(m.quickFindText)
-		cur := min(m.quickFindCursor, len(runes))
 		var inputLine string
 
 		if m.quickFindSelecting {
-			inputLine = fmt.Sprintf("  %s   %s", SearchIcon, Gray(m.quickFindText))
+			inputLine = fmt.Sprintf("  %s   %s", SearchIcon, Gray(m.quickFindInput.Value()))
 		} else {
-			before := string(runes[:cur])
-			after := string(runes[cur:])
-			inputLine = fmt.Sprintf("  %s  %s█%s", SearchIcon, before, after)
+			inputLine = fmt.Sprintf("  %s  %s", SearchIcon, m.quickFindInput.View())
 		}
 
 		// Horizontal divider (dialogW - 4 accounts for Padding(1, 2) which takes 4 columns)
@@ -704,7 +691,7 @@ func (m model) View() tea.View {
 
 		// Build results list
 		var resultLines []string
-		if len(m.quickFindResults) == 0 && m.quickFindText == "" {
+		if len(m.quickFindResults) == 0 && m.quickFindInput.Value() == "" {
 			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("Bookmarks are shown here…")))
 		} else if len(m.quickFindResults) == 0 {
 			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("No results")))

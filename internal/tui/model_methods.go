@@ -11,8 +11,7 @@ func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
 	t.filesPath = t.filesPath[:0]
 	t.filteredFiles = nil
 	m.searchActive = false
-	m.searchText = ""
-	m.searchCursor = 0
+	m.searchInput.SetValue("")
 	for _, entry := range entries {
 		if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 			continue
@@ -47,8 +46,7 @@ func (m *model) refreshAllTabs() {
 		t.filesPath = t.filesPath[:0]
 		t.filteredFiles = nil
 		m.searchActive = false
-		m.searchText = ""
-		m.searchCursor = 0
+		m.searchInput.SetValue("")
 		for _, entry := range entries {
 			if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 				continue
@@ -79,10 +77,10 @@ func (m *model) refreshAllTabs() {
 
 func (m *model) applySearchFilter() {
 	t := m.curTab()
-	if m.searchText == "" {
+	if m.searchInput.Value() == "" {
 		t.filteredFiles = nil
 	} else {
-		query := strings.ToLower(m.searchText)
+		query := strings.ToLower(m.searchInput.Value())
 		t.filteredFiles = make([]string, 0)
 		for _, name := range t.filesPath {
 			if strings.Contains(strings.ToLower(name), query) {

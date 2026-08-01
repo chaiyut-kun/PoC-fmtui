@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 
+	"charm.land/lipgloss/v2"
 	"github.com/fatih/color"
 )
 
@@ -25,6 +26,8 @@ var (
 	BgGreen   = color.New(color.BgGreen).SprintFunc()
 	BgWhite   = color.New(color.BgWhite).SprintFunc()
 	BgMagenta = color.New(color.BgMagenta).SprintFunc()
+
+	lightGray = lipgloss.Color("241")
 )
 
 const ItemEndSpace = " "

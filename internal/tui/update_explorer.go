@@ -77,12 +77,12 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "ctrl+f":
 		m.quickFindOpen = true
-		m.quickFindText = ""
-		m.quickFindCursor = 0
+		m.quickFindInput.SetValue("")
+		cmd := m.quickFindInput.Focus()
 		m.quickFindSelected = 0
 		m.quickFindSelecting = false
 		m.quickFindResults = nil
-		return m, m.quickFindSearchCmd("")
+		return m, tea.Batch(cmd, m.quickFindSearchCmd(""))
 	case "esc":
 		m.selected = make(map[int]struct{})
 		m.stagedPaths = nil
@@ -230,15 +230,18 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.err = nil
 		m.inputMode = true
 		m.isRenaming = true
-		m.inputText = t.visibleFiles()[t.cursor]
-		// ponytail: cursor before ".ext"; dirs and dotfiles go to end
 		name := t.visibleFiles()[t.cursor]
-		m.inputCursor = len([]rune(name)) // default: end
+		m.fileInput.SetValue(name)
+		cmd := m.fileInput.Focus()
+		// ponytail: cursor before ".ext"; dirs and dotfiles go to end
+		cur := len([]rune(name)) // default: end
 		if !isDir(t.currentDir, name) {
 			if dot := strings.LastIndex(name, "."); dot > 0 {
-				m.inputCursor = len([]rune(name[:dot]))
+				cur = len([]rune(name[:dot]))
 			}
 		}
+		m.fileInput.SetCursor(cur)
+		return m, cmd
 
 	// Undo
 	case "u":
@@ -252,9 +255,11 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "f", "F":
 		m.err = nil
 		m.inputMode = true
-		m.inputText = ""
+		m.fileInput.SetValue("")
+		cmd := m.fileInput.Focus()
 		m.isCreatingDir = false
 		m.isRenaming = false
+		return m, cmd
 
 	// Toggle Select All ('a' / 'A')
 	case "a", "A":
@@ -362,9 +367,11 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = fmt.Sprintf("Staged %d item(s) to move. Press 'v' or 'p' to paste.", len(m.stagedPaths))
 		} else {
 			m.inputMode = true
-			m.inputText = ""
+			m.fileInput.SetValue("")
+			cmd := m.fileInput.Focus()
 			m.isCreatingDir = true
 			m.isRenaming = false
+			return m, cmd
 		}
 
 	// Copy selected / copy file path
@@ -502,9 +509,9 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "s":
 		if m.activePane == 1 {
 			m.searchActive = true
-			m.searchText = ""
-			m.searchCursor = 0
-			return m, nil
+			m.searchInput.SetValue("")
+			cmd := m.searchInput.Focus()
+			return m, cmd
 		}
 	}
 

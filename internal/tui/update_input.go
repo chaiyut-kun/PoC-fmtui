@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -105,23 +104,27 @@ func (m model) handleSearchKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc":
 			m.searchActive = false
-			m.searchText = ""
-			m.searchCursor = 0
+			m.searchInput.Blur()
+			m.searchInput.SetValue("")
 			t := m.curTab()
 			t.filteredFiles = nil
 			t.cursor = 0
 			t.scrollOffset = 0
 			m.adjustScroll()
+			return m, nil
 		case "enter":
 			m.searchActive = false
+			m.searchInput.Blur()
+			return m, nil
 		default:
-			oldText := m.searchText
-			m.searchText, m.searchCursor = handleTextEdit(msg.String(), m.searchText, m.searchCursor)
-			if m.searchText != oldText {
+			oldText := m.searchInput.Value()
+			var cmd tea.Cmd
+			m.searchInput, cmd = m.searchInput.Update(msg)
+			if m.searchInput.Value() != oldText {
 				m.applySearchFilter()
 			}
+			return m, cmd
 		}
-		return m, nil
 	}
 
 	return m, nil
@@ -133,17 +136,19 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "enter":
 			m.inputMode = false
-			m.inputCursor = 0
-			if m.inputText == "" {
+			m.fileInput.Blur()
+			val := m.fileInput.Value()
+			m.fileInput.SetValue("")
+			if val == "" {
 				m.isRenaming = false
-				break
+				return m, nil
 			}
 
 			if m.isRenaming {
 				if len(t.visibleFiles()) > 0 {
 					oldName := t.visibleFiles()[t.cursor]
 					oldPath := findAbsPath(t.currentDir, oldName)
-					newPath := filepath.Join(t.currentDir, m.inputText)
+					newPath := filepath.Join(t.currentDir, val)
 					if err := os.Rename(oldPath, newPath); err != nil {
 						m.err = err
 					} else {
@@ -156,16 +161,16 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					}
 				}
 				m.isRenaming = false
-				break
+				return m, nil
 			}
 
-			filePath := filepath.Join(t.currentDir, m.inputText)
+			filePath := filepath.Join(t.currentDir, val)
 
 			if m.isCreatingDir {
 				err := os.Mkdir(filePath, 0755)
 				if err != nil {
 					m.err = err
-					break
+					return m, nil
 				}
 				m.pushAction(ActionRecord{
 					Type:         ActionCreate,
@@ -176,7 +181,7 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				file, err := os.Create(filePath)
 				if err != nil {
 					m.err = err
-					break
+					return m, nil
 				}
 				file.Close()
 				m.pushAction(ActionRecord{
@@ -188,109 +193,24 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 			m.reloadCurrentDir()
 			m.adjustScroll()
+			return m, nil
 		case "esc":
 			m.inputMode = false
-			m.inputText = ""
-			m.inputCursor = 0
+			m.fileInput.Blur()
+			m.fileInput.SetValue("")
 			m.isRenaming = false
+			return m, nil
 		default:
-			m.inputText, m.inputCursor = handleTextEdit(msg.String(), m.inputText, m.inputCursor)
+			var cmd tea.Cmd
+			m.fileInput, cmd = m.fileInput.Update(msg)
+			return m, cmd
 		}
-		return m, nil
 	}
 
 	return m, nil
 }
 
-// handleTextEdit applies a single key event to a (text, cursor) pair.
-// Handles: printable chars, backspace, left/right/home/end.
-// ponytail: pure function — no model mutation, easy to test.
-func handleTextEdit(key, text string, cursor int) (string, int) {
-	runes := []rune(text)
-	switch key {
-	case "left":
-		if cursor > 0 {
-			cursor--
-		}
-	case "right":
-		if cursor < len(runes) {
-			cursor++
-		}
-	case "home":
-		cursor = 0
-	case "end":
-		cursor = len(runes)
-	case "backspace":
-		if cursor > 0 {
-			runes = append(runes[:cursor-1], runes[cursor:]...)
-			text = string(runes)
-			cursor--
-		}
-	case "alt+left", "ctrl+left", "alt+b":
-		if cursor > 0 {
-			newCursor := cursor - 1
-			for newCursor >= 0 && unicode.IsSpace(runes[newCursor]) {
-				newCursor--
-			}
-			for newCursor >= 0 && !unicode.IsSpace(runes[newCursor]) {
-				newCursor--
-			}
-			cursor = newCursor + 1
-		}
-	case "alt+right", "ctrl+right", "alt+f":
-		if cursor < len(runes) {
-			newCursor := cursor
-			for newCursor < len(runes) && unicode.IsSpace(runes[newCursor]) {
-				newCursor++
-			}
-			for newCursor < len(runes) && !unicode.IsSpace(runes[newCursor]) {
-				newCursor++
-			}
-			cursor = newCursor
-		}
-	case "ctrl+w", "alt+backspace", "ctrl+backspace":
-		if cursor > 0 {
-			newCursor := cursor - 1
-			for newCursor >= 0 && unicode.IsSpace(runes[newCursor]) {
-				newCursor--
-			}
-			for newCursor >= 0 && !unicode.IsSpace(runes[newCursor]) {
-				newCursor--
-			}
-			newCursor++
-			runes = append(runes[:newCursor], runes[cursor:]...)
-			text = string(runes)
-			cursor = newCursor
-		}
-	case "alt+delete", "ctrl+delete":
-		if cursor < len(runes) {
-			newCursor := cursor
-			for newCursor < len(runes) && unicode.IsSpace(runes[newCursor]) {
-				newCursor++
-			}
-			for newCursor < len(runes) && !unicode.IsSpace(runes[newCursor]) {
-				newCursor++
-			}
-			runes = append(runes[:cursor], runes[newCursor:]...)
-			text = string(runes)
-		}
-	case "ctrl+u":
-		runes = runes[cursor:]
-		text = string(runes)
-		cursor = 0
-	case "ctrl+k":
-		runes = runes[:cursor]
-		text = string(runes)
-	default:
-		r := []rune(key)
-		if len(r) == 1 {
-			runes = append(runes[:cursor], append([]rune{r[0]}, runes[cursor:]...)...)
-			text = string(runes)
-			cursor++
-		}
-	}
-	return text, cursor
-}
+
 
 // quickFindResultsMsg delivers async search results back to the Update loop.
 type quickFindResultsMsg struct {
@@ -328,7 +248,8 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch key {
 	case "esc":
 		m.quickFindOpen = false
-		m.quickFindText = ""
+		m.quickFindInput.Blur()
+		m.quickFindInput.SetValue("")
 		m.quickFindResults = nil
 		m.quickFindSelecting = false
 
@@ -368,39 +289,49 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.quickFindOpen = false
-			m.quickFindText = ""
+			m.quickFindInput.Blur()
+			m.quickFindInput.SetValue("")
 			m.quickFindResults = nil
 			m.quickFindSelecting = false
 		} else {
 			if len(m.quickFindResults) > 0 {
 				m.quickFindSelecting = true
 				m.quickFindSelected = 0
+				m.quickFindInput.Blur()
 			}
 		}
 
 	case "tab":
 		if len(m.quickFindResults) > 0 {
 			m.quickFindSelecting = !m.quickFindSelecting
+			if m.quickFindSelecting {
+				m.quickFindInput.Blur()
+			} else {
+				m.quickFindInput.Focus()
+			}
 		}
 
 	case "up":
 		if len(m.quickFindResults) > 0 {
 			m.quickFindSelecting = true
 			m.quickFindSelected = len(m.quickFindResults) - 1
+			m.quickFindInput.Blur()
 		}
 
 	case "down":
 		if len(m.quickFindResults) > 0 {
 			m.quickFindSelecting = true
 			m.quickFindSelected = 0
+			m.quickFindInput.Blur()
 		}
 
 	default:
 		if !m.quickFindSelecting {
-			m.quickFindText, m.quickFindCursor = handleTextEdit(key, m.quickFindText, m.quickFindCursor)
+			var cmd tea.Cmd
+			m.quickFindInput, cmd = m.quickFindInput.Update(msg)
 			m.quickFindSelected = 0
 			// Walk runs in a goroutine; results arrive via quickFindResultsMsg.
-			return m, m.quickFindSearchCmd(m.quickFindText)
+			return m, tea.Batch(cmd, m.quickFindSearchCmd(m.quickFindInput.Value()))
 		}
 	}
 	return m, nil

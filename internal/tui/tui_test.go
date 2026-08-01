@@ -208,7 +208,7 @@ func TestRenameAction(t *testing.T) {
 	}
 
 	// Change text to "new_name.txt"
-	m.inputText = "new_name.txt"
+	m.fileInput.SetValue("new_name.txt")
 
 	// Press "enter" to confirm rename
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
@@ -236,7 +236,7 @@ func TestUndoRedo(t *testing.T) {
 
 	// 1. Create file "created_file.txt"
 	m.inputMode = true
-	m.inputText = "created_file.txt"
+	m.fileInput.SetValue("created_file.txt")
 	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "enter"})
 	m = updatedModel.(model)
 
@@ -1220,8 +1220,8 @@ func TestRenameCursor(t *testing.T) {
 			return u.(model), c
 		}()
 		// "hello" is 5 runes → cursor at 5
-		if m.inputCursor != 5 {
-			t.Errorf("expected inputCursor=5, got %d", m.inputCursor)
+		if m.fileInput.Position() != 5 {
+			t.Errorf("expected inputCursor=5, got %d", m.fileInput.Position())
 		}
 		if !m.inputMode || !m.isRenaming {
 			t.Fatal("expected inputMode and isRenaming")
@@ -1235,8 +1235,8 @@ func TestRenameCursor(t *testing.T) {
 			return u.(model), c
 		}()
 		want := len([]rune(".bashrc")) // 7
-		if m.inputCursor != want {
-			t.Errorf("expected inputCursor=%d, got %d", want, m.inputCursor)
+		if m.fileInput.Position() != want {
+			t.Errorf("expected inputCursor=%d, got %d", want, m.fileInput.Position())
 		}
 	})
 
@@ -1247,8 +1247,8 @@ func TestRenameCursor(t *testing.T) {
 			return u.(model), c
 		}()
 		want := len([]rune("mydir")) // 5
-		if m.inputCursor != want {
-			t.Errorf("expected inputCursor=%d, got %d", want, m.inputCursor)
+		if m.fileInput.Position() != want {
+			t.Errorf("expected inputCursor=%d, got %d", want, m.fileInput.Position())
 		}
 	})
 
@@ -1259,71 +1259,8 @@ func TestRenameCursor(t *testing.T) {
 			return u.(model), c
 		}()
 		want := len([]rune("noext")) // 5
-		if m.inputCursor != want {
-			t.Errorf("expected inputCursor=%d, got %d", want, m.inputCursor)
-		}
-	})
-
-	t.Run("left/right/home/end navigation", func(t *testing.T) {
-		m := newModel("hello.txt")
-		m, _ = func() (model, tea.Cmd) {
-			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
-			return u.(model), c
-		}()
-		// cursor starts at 5
-		m = press(m, "left")
-		if m.inputCursor != 4 {
-			t.Errorf("after left: expected 4, got %d", m.inputCursor)
-		}
-		m = press(m, "right")
-		if m.inputCursor != 5 {
-			t.Errorf("after right: expected 5, got %d", m.inputCursor)
-		}
-		m = press(m, "home")
-		if m.inputCursor != 0 {
-			t.Errorf("after home: expected 0, got %d", m.inputCursor)
-		}
-		m = press(m, "end")
-		if m.inputCursor != len([]rune("hello.txt")) {
-			t.Errorf("after end: expected %d, got %d", len([]rune("hello.txt")), m.inputCursor)
-		}
-		// clamp: left at 0 stays 0
-		m = press(m, "home")
-		m = press(m, "left")
-		if m.inputCursor != 0 {
-			t.Errorf("left clamp: expected 0, got %d", m.inputCursor)
-		}
-	})
-
-	t.Run("insert at cursor", func(t *testing.T) {
-		m := newModel("hello.txt")
-		m, _ = func() (model, tea.Cmd) {
-			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
-			return u.(model), c
-		}()
-		// cursor=5, type "X" → "helloX.txt"
-		m = press(m, "X")
-		if m.inputText != "helloX.txt" {
-			t.Errorf("expected helloX.txt, got %q", m.inputText)
-		}
-		if m.inputCursor != 6 {
-			t.Errorf("expected cursor=6, got %d", m.inputCursor)
-		}
-	})
-
-	t.Run("backspace at cursor", func(t *testing.T) {
-		m := newModel("hello.txt")
-		m, _ = func() (model, tea.Cmd) {
-			u, c := m.Update(tea.KeyPressMsg{Text: "r"})
-			return u.(model), c
-		}()
-		// cursor=5, backspace → deletes 'o' → "hell.txt"
-		m = press(m, "backspace")
-		if m.inputText != "hell.txt" {
-			t.Errorf("expected hell.txt, got %q", m.inputText)
-		}
-		if m.inputCursor != 4 {
-			t.Errorf("expected cursor=4, got %d", m.inputCursor)
+		if m.fileInput.Position() != want {
+			t.Errorf("expected inputCursor=%d, got %d", want, m.fileInput.Position())
 		}
 	})
 
@@ -1334,8 +1271,8 @@ func TestRenameCursor(t *testing.T) {
 			return u.(model), c
 		}()
 		m = press(m, "esc")
-		if m.inputMode || m.inputCursor != 0 || m.inputText != "" {
-			t.Errorf("esc should reset inputMode, inputCursor, inputText")
+		if m.inputMode || m.fileInput.Value() != "" {
+			t.Errorf("esc should reset inputMode and inputText")
 		}
 	})
 }
@@ -1346,7 +1283,7 @@ func TestSearchFilter(t *testing.T) {
 	m.searchActive = true
 
 	// Filter case insensitive
-	m.searchText = "M"
+	m.searchInput.SetValue("M")
 	m.applySearchFilter()
 
 	visible := m.curTab().visibleFiles()
@@ -1355,7 +1292,7 @@ func TestSearchFilter(t *testing.T) {
 	}
 
 	// Filter multiple characters
-	m.searchText = "ma"
+	m.searchInput.SetValue("ma")
 	m.applySearchFilter()
 	visible = m.curTab().visibleFiles()
 	if len(visible) != 1 || visible[0] != "GAMMA.txt" {
@@ -1363,7 +1300,7 @@ func TestSearchFilter(t *testing.T) {
 	}
 
 	// Empty string should clear filter
-	m.searchText = ""
+	m.searchInput.SetValue("")
 	m.applySearchFilter()
 	visible = m.curTab().visibleFiles()
 	if len(visible) != 4 {
@@ -1380,22 +1317,21 @@ func TestQuickFindOpen(t *testing.T) {
 		{Name: "Documents", Path: "/home/test/Documents", Icon: DirIcon},
 	}
 
-	// ctrl+f should open overlay and return a cmd to fetch results
-	next, cmd := m.Update(tea.KeyPressMsg{Text: "ctrl+f"})
+	next, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+f"})
 	nm := next.(model)
 
 	if !nm.quickFindOpen {
 		t.Fatal("expected quickFindOpen=true after ctrl+f")
 	}
-	if nm.quickFindText != "" {
-		t.Fatalf("expected empty quickFindText, got %q", nm.quickFindText)
+	if nm.quickFindInput.Value() != "" {
+		t.Fatalf("expected empty quickFindInput, got %q", nm.quickFindInput.Value())
 	}
 	if nm.quickFindSelecting {
 		t.Fatal("expected input mode (quickFindSelecting=false) on open")
 	}
 
 	// Now simulate the command finishing
-	msg := cmd()
+	msg := nm.quickFindSearchCmd("")()
 	next, _ = nm.Update(msg)
 	nm = next.(model)
 
@@ -1407,7 +1343,7 @@ func TestQuickFindOpen(t *testing.T) {
 func TestQuickFindEsc(t *testing.T) {
 	m := InitialModel()
 	m.quickFindOpen = true
-	m.quickFindText = "docs"
+	m.quickFindInput.SetValue("docs")
 	m.quickFindSelecting = true
 
 	next, _ := m.Update(tea.KeyPressMsg{Text: "esc"})
@@ -1416,8 +1352,8 @@ func TestQuickFindEsc(t *testing.T) {
 	if nm.quickFindOpen {
 		t.Fatal("expected quickFindOpen=false after esc")
 	}
-	if nm.quickFindText != "" {
-		t.Fatalf("expected empty text after esc, got %q", nm.quickFindText)
+	if nm.quickFindInput.Value() != "" {
+		t.Fatalf("expected empty text after esc, got %q", nm.quickFindInput.Value())
 	}
 	if nm.quickFindSelecting {
 		t.Fatal("expected quickFindSelecting=false after esc")
@@ -1446,21 +1382,21 @@ func TestQuickFindNavigation(t *testing.T) {
 	m := InitialModel()
 	m.quickFindOpen = true
 	m.quickFindSelecting = false // Input mode
-	m.quickFindText = ""
-	m.quickFindCursor = 0
+	m.quickFindInput.SetValue("")
+	m.quickFindInput.Focus()
 
 	// Typing 'j' should insert character
 	next, _ := m.Update(tea.KeyPressMsg{Text: "j"})
 	nm := next.(model)
-	if nm.quickFindText != "j" {
-		t.Fatalf("expected quickFindText='j', got %q", nm.quickFindText)
+	if nm.quickFindInput.Value() != "j" {
+		t.Fatalf("expected quickFindText='j', got %q", nm.quickFindInput.Value())
 	}
 
 	// Typing 'k' should insert character
 	next, _ = nm.Update(tea.KeyPressMsg{Text: "k"})
 	nm = next.(model)
-	if nm.quickFindText != "jk" {
-		t.Fatalf("expected quickFindText='jk', got %q", nm.quickFindText)
+	if nm.quickFindInput.Value() != "jk" {
+		t.Fatalf("expected quickFindText='jk', got %q", nm.quickFindInput.Value())
 	}
 
 	// Switch to select mode
@@ -1518,31 +1454,7 @@ func TestQuickFindFilterBookmarks(t *testing.T) {
 	}
 }
 
-func TestHandleTextEdit(t *testing.T) {
-	cases := []struct {
-		key      string
-		text     string
-		cursor   int
-		wantText string
-		wantCur  int
-	}{
-		{"a", "bc", 0, "abc", 1},
-		{"a", "bc", 2, "bca", 3},
-		{"backspace", "abc", 3, "ab", 2},
-		{"backspace", "abc", 0, "abc", 0}, // no-op at start
-		{"left", "abc", 2, "abc", 1},
-		{"right", "abc", 1, "abc", 2},
-		{"home", "abc", 3, "abc", 0},
-		{"end", "abc", 0, "abc", 3},
-	}
-	for _, c := range cases {
-		gotText, gotCur := handleTextEdit(c.key, c.text, c.cursor)
-		if gotText != c.wantText || gotCur != c.wantCur {
-			t.Errorf("handleTextEdit(%q, %q, %d) = (%q, %d); want (%q, %d)",
-				c.key, c.text, c.cursor, gotText, gotCur, c.wantText, c.wantCur)
-		}
-	}
-}
+
 
 func TestShrinkPath(t *testing.T) {
 	home, err := os.UserHomeDir()

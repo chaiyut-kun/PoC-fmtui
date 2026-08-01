@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type subshellFinishedMsg struct{ err error }
@@ -59,8 +61,7 @@ type model struct {
 	terminalHeight            int
 	terminalWidth             int
 	inputMode                 bool
-	inputText                 string
-	inputCursor               int // rune index into inputText; ponytail: single int, no textarea widget
+	fileInput                 textinput.Model
 	isCreatingDir             bool
 	isRenaming                bool
 	copyMenuOpen              bool
@@ -89,11 +90,9 @@ type model struct {
 	copyProgressChan          chan tea.Msg
 	copyJobCancel             chan struct{}
 	searchActive              bool
-	searchText                string
-	searchCursor              int
+	searchInput               textinput.Model
 	quickFindOpen             bool
-	quickFindText             string
-	quickFindCursor           int
+	quickFindInput            textinput.Model
 	quickFindResults          []ShortcutEntry
 	quickFindSelected         int
 	quickFindSelecting        bool // false=input mode, true=select mode
@@ -280,6 +279,32 @@ func InitialModel() model {
 		filesPath:  files,
 	}
 
+	phStyle := lipgloss.NewStyle().Foreground(lightGray)
+
+	fi := textinput.New()
+	fi.Prompt = ""
+	fi.Placeholder = "Enter filename"
+	fiStyles := fi.Styles()
+	fiStyles.Blurred.Placeholder = phStyle
+	fiStyles.Focused.Placeholder = phStyle
+	fi.SetStyles(fiStyles)
+	
+	si := textinput.New()
+	si.Prompt = ""
+	si.Placeholder = "Search..."
+	siStyles := si.Styles()
+	siStyles.Blurred.Placeholder = phStyle
+	siStyles.Focused.Placeholder = phStyle
+	si.SetStyles(siStyles)
+	
+	qi := textinput.New()
+	qi.Prompt = ""
+	qi.Placeholder = "Quick find..."
+	qiStyles := qi.Styles()
+	qiStyles.Blurred.Placeholder = phStyle
+	qiStyles.Focused.Placeholder = phStyle
+	qi.SetStyles(qiStyles)
+
 	return model{
 		tabs:             []TabState{initialTab},
 		activeTab:        0,
@@ -289,6 +314,9 @@ func InitialModel() model {
 		config:           loadUserConfig(),
 		activePane:       1,
 		shortcutPaneOpen: true,
+		fileInput:        fi,
+		searchInput:      si,
+		quickFindInput:   qi,
 	}
 }
 

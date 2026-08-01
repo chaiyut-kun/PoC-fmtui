@@ -152,5 +152,21 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleExplorerKeys(msg)
 	}
 
-	return m, nil
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
+
+	if m.inputMode {
+		m.fileInput, cmd = m.fileInput.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+	if m.searchActive {
+		m.searchInput, cmd = m.searchInput.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+	if m.quickFindOpen {
+		m.quickFindInput, cmd = m.quickFindInput.Update(msg)
+		cmds = append(cmds, cmd)
+	}
+
+	return m, tea.Batch(cmds...)
 }
