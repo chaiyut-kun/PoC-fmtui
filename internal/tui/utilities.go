@@ -316,6 +316,13 @@ func overlayLine(bg string, fg string, startCol int) string {
 		i++
 	}
 
+	// Compensate for extra skipped visual width to prevent right border shifting
+	if skippedWidth > fgVisibleWidth {
+		for k := 0; k < skippedWidth-fgVisibleWidth; k++ {
+			result.WriteRune(' ')
+		}
+	}
+
 	for i < len(bgRunes) {
 		result.WriteRune(bgRunes[i])
 		i++

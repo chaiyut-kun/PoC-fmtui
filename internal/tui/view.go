@@ -160,15 +160,7 @@ func (m model) View() tea.View {
 			Gray("─"), Yellow(meta.SizeStr), meta.PermStr, meta.OwnerGroup, meta.ModTimeStr))
 	}
 
-	if m.inputMode {
-		prompt := "Create file"
-		if m.isRenaming {
-			prompt = "Rename"
-		} else if m.isCreatingDir {
-			prompt = "Create directory"
-		}
-		sb.WriteString(fmt.Sprintf("%s: %s\n(Enter to confirm, Esc to cancel)\n", prompt, m.fileInput.View()))
-	}
+
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
 	renderedText := strings.TrimSuffix(sb.String(), "\n")
@@ -595,6 +587,54 @@ func (m model) View() tea.View {
 			"Press ESC to cancel"
 
 		dialog := dialogStyle.Render(dialogContent)
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
+	}
+
+	// Render create / rename input overlay
+	if m.inputMode {
+		prompt := "Create file"
+		titleText := "New item"
+		if m.isRenaming {
+			prompt = "Rename"
+			titleText = "Rename"
+		} else if m.isCreatingDir {
+			prompt = "Create directory"
+		}
+
+		dialogContent := "\n  " + prompt + ":  " + m.fileInput.View() +
+			"\n\n  " + Gray("Enter to confirm • Esc to cancel")
+
+		// Width is exactly 60 characters outer width (content width is 56)
+		dialogWidth := 60
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(pink)).
+			Padding(0, 1).
+			Width(dialogWidth - 4)
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		// Inject left-aligned title on top border of dialog using PlaceHorizontal
+		dialogLines := strings.Split(dialog, "\n")
+		if len(dialogLines) > 0 {
+			dialogWidth := lipgloss.Width(dialog)
+			barWidth := dialogWidth - 2
+			titleStr := " " + titleText + " "
+			runes := []rune(titleStr)
+			if len(runes) > barWidth {
+				titleStr = string(runes[:barWidth])
+			}
+			middle := lipgloss.PlaceHorizontal(
+				barWidth,
+				lipgloss.Left,
+				titleStr,
+				lipgloss.WithWhitespaceChars("─"),
+			)
+			topStr := "╭" + middle + "╮"
+			dialogLines[0] = lipgloss.NewStyle().Foreground(lipgloss.Color(pink)).Render(topStr)
+			dialog = strings.Join(dialogLines, "\n")
+		}
+
 		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 

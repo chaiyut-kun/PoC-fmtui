@@ -28,6 +28,7 @@ var (
 	BgMagenta = color.New(color.BgMagenta).SprintFunc()
 
 	lightGray = lipgloss.Color("241")
+	pink      = "205"
 )
 
 const ItemEndSpace = " "
