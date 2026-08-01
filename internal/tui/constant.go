@@ -86,7 +86,7 @@ const (
 const (
 	quickSearchWidthDefault     = 80
 	quickSearchHalfWidth        = 40
-	quickSearchMaxResultDefault = 20
+	quickSearchMaxResultDefault = 10
 
 	DefaultYDivisor = 2
 

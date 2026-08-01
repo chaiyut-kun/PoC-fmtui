@@ -173,8 +173,8 @@ func (m model) View() tea.View {
 	if height < minScreenHeight {
 		height = defaultScreenHeight
 	}
-	
-	//prepare for if any error 
+
+	//prepare for if any error
 	bottomBarLines := 0
 	if m.err != nil {
 		bottomBarLines = 2
@@ -755,6 +755,11 @@ func (m model) View() tea.View {
 				}
 				resultLines = append(resultLines, line)
 			}
+		}
+
+		// Pad resultLines to maxResults so height doesn't change
+		for len(resultLines) < maxResults {
+			resultLines = append(resultLines, "")
 		}
 
 		// Assemble dialog content
