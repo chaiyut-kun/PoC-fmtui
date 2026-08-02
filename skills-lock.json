@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "go-development": {
+      "source": "netresearch/go-development-skill",
+      "sourceType": "github",
+      "skillPath": "skills/go-development/SKILL.md",
+      "computedHash": "085e806bf36f4775104f695a7d30df8cf16c0a27e5308acd5b21e2c53e866a8f"
+    },
     "golang-design-patterns": {
       "source": "samber/cc-skills-golang",
       "sourceType": "github",
