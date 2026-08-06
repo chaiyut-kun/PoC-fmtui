@@ -4,28 +4,38 @@ import (
 	"fmt"
 
 	"charm.land/lipgloss/v2"
-	"github.com/fatih/color"
 )
+
+func makeFg(c string) func(...any) string {
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(c))
+	return func(a ...any) string { return style.Render(fmt.Sprint(a...)) }
+}
+
+func makeBg(c string) func(...any) string {
+	style := lipgloss.NewStyle().Background(lipgloss.Color(c))
+	return func(a ...any) string { return style.Render(fmt.Sprint(a...)) }
+}
 
 var (
 	Plain   = func(a ...any) string { return fmt.Sprint(a...) }
-	Red     = color.New(color.FgRed).SprintFunc()
-	Blue    = color.New(color.FgBlue).SprintFunc()
-	Cyan    = color.New(color.FgCyan).SprintFunc()
-	Magenta = color.New(color.FgMagenta).SprintFunc()
-	Yellow  = color.New(color.FgYellow).SprintFunc()
-	White   = color.New(color.FgWhite).SprintFunc()
-	Green   = color.New(color.FgGreen).SprintFunc()
-	Gray    = color.New(color.FgWhite).SprintFunc() // FgWhite is standard gray on standard terminals
-	Black   = color.New(color.FgBlack).SprintFunc()
+	Red     = makeFg("9")
+	Blue    = makeFg("12")
+	Cyan    = makeFg("14")
+	Magenta = makeFg("13")
+	Yellow  = makeFg("11")
+	White   = makeFg("15")
+	Green   = makeFg("10")
+	Gray    = makeFg("241")
+	Black   = makeFg("0")
+	Orange  = makeFg("208")
 
-	BgRed     = color.New(color.BgRed).SprintFunc()
-	BgBlue    = color.New(color.BgBlue).SprintFunc()
-	BgCyan    = color.New(color.BgCyan).SprintFunc()
-	BgYellow  = color.New(color.BgYellow).SprintFunc()
-	BgGreen   = color.New(color.BgGreen).SprintFunc()
-	BgWhite   = color.New(color.BgWhite).SprintFunc()
-	BgMagenta = color.New(color.BgMagenta).SprintFunc()
+	BgRed     = makeBg("9")
+	BgBlue    = makeBg("12")
+	BgCyan    = makeBg("14")
+	BgYellow  = makeBg("11")
+	BgGreen   = makeBg("10")
+	BgWhite   = makeBg("15")
+	BgMagenta = makeBg("13")
 
 	lightGray = lipgloss.Color("241")
 	pink      = "205"

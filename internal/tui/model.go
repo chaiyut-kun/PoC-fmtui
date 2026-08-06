@@ -69,6 +69,8 @@ type model struct {
 	permissionMenuOpen        bool
 	openMenuOpen              bool
 	helpMenuOpen              bool
+	helpSearchActive          bool
+	helpScrollOffset          int
 	activePane                int // 0 = Left (FM), 1 = Right (Preview)
 	stagedPaths               []string
 	stagedOp                  string

@@ -290,7 +290,50 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.helpMenuOpen {
-		m.helpMenuOpen = false
+		if m.helpSearchActive {
+			switch msg.String() {
+			case "esc":
+				m.helpSearchActive = false
+				m.searchInput.Blur()
+				m.searchInput.SetValue("")
+				m.searchInput.Placeholder = "search file / directory"
+			case "enter":
+				m.helpSearchActive = false
+				m.searchInput.Blur()
+			case "up":
+				if m.helpScrollOffset > 0 {
+					m.helpScrollOffset--
+				}
+			case "down":
+				m.helpScrollOffset++
+			default:
+				var cmd tea.Cmd
+				m.searchInput, cmd = m.searchInput.Update(msg)
+				return m, cmd
+			}
+			return m, nil
+		}
+
+		switch msg.String() {
+		case "s", "S":
+			m.helpSearchActive = true
+			m.searchInput.Placeholder = "Search help..."
+			m.searchInput.SetValue("")
+			m.helpScrollOffset = 0
+			return m, m.searchInput.Focus()
+		case "j", "down":
+			m.helpScrollOffset++
+		case "k", "up":
+			if m.helpScrollOffset > 0 {
+				m.helpScrollOffset--
+			}
+		case "esc", "`":
+			m.helpMenuOpen = false
+			m.searchInput.SetValue("")
+			m.searchInput.Blur()
+			m.searchInput.Placeholder = "search file / directory"
+			m.helpScrollOffset = 0
+		}
 		return m, nil
 	}
 

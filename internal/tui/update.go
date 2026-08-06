@@ -56,7 +56,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		t := m.curTab()
 		switch mouseEvent.Button {
 		case tea.MouseWheelUp:
-			if m.activePane == 0 && m.shortcutPaneOpen {
+			if m.helpMenuOpen {
+				if m.helpScrollOffset > 0 {
+					m.helpScrollOffset--
+				}
+			} else if m.activePane == 0 && m.shortcutPaneOpen {
 				if m.shortcutCursor > 0 {
 					m.shortcutCursor--
 				}
@@ -73,7 +77,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 
 		case tea.MouseWheelDown:
-			if m.activePane == 0 && m.shortcutPaneOpen {
+			if m.helpMenuOpen {
+				m.helpScrollOffset++
+			} else if m.activePane == 0 && m.shortcutPaneOpen {
 				limit := len(m.shortcuts) - 1
 				if m.shortcutTab == 1 {
 					limit = len(m.bookmarks) - 1

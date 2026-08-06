@@ -8,7 +8,6 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/fatih/color"
 )
 
 const (
@@ -54,6 +53,79 @@ const (
 func (m model) View() tea.View {
 	if m.quitting {
 		return tea.NewView("")
+	}
+
+	if m.helpMenuOpen {
+		width := m.terminalWidth
+		height := m.terminalHeight
+		
+		helpStyle := lipgloss.NewStyle().
+			Width(width).
+			Height(height).
+			Padding(2, 4)
+
+		var sb strings.Builder
+		sb.WriteString(Orange("FMTUI Help Menu") + "\n\n")
+
+		// Render help search bar
+		if m.helpSearchActive {
+			sb.WriteString(fmt.Sprintf("%s %s\n\n", SearchIcon, m.searchInput.View()))
+		} else if m.searchInput.Value() != "" {
+			sb.WriteString(fmt.Sprintf("%s %s\n\n", SearchIcon, m.searchInput.Value()))
+		} else {
+			sb.WriteString(Gray(fmt.Sprintf("%s press s to search help", SearchIcon)) + "\n\n")
+		}
+
+		query := strings.ToLower(m.searchInput.Value())
+		hasFilter := query != ""
+
+		var renderedLines []string
+		if hasFilter {
+			for _, item := range helpItems {
+				if item.heading {
+					continue
+				}
+				if strings.Contains(strings.ToLower(item.key), query) || strings.Contains(strings.ToLower(item.desc), query) {
+					renderedLines = append(renderedLines, fmt.Sprintf("  %-22s  %s", Green(item.key), item.desc))
+				}
+			}
+			if len(renderedLines) == 0 {
+				renderedLines = append(renderedLines, "  No matching commands found")
+			}
+		} else {
+			for _, item := range helpItems {
+				if item.heading {
+					renderedLines = append(renderedLines, "\n"+Orange(item.desc))
+				} else {
+					renderedLines = append(renderedLines, fmt.Sprintf("  %-22s  %s", Green(item.key), item.desc))
+				}
+			}
+		}
+
+		// Available height for lines: terminal height minus header, search bar, instructions, and padding.
+		// Height - (2 top padding + 1 header + 2 search bar + 2 bottom spacing + 2 padding)
+		availableHeight := max(height-9, 5)
+
+		// Clamp scroll offset
+		maxScroll := max(len(renderedLines)-availableHeight, 0)
+		if m.helpScrollOffset > maxScroll {
+			m.helpScrollOffset = maxScroll
+		}
+		if m.helpScrollOffset < 0 {
+			m.helpScrollOffset = 0
+		}
+
+		endLine := min(m.helpScrollOffset+availableHeight, len(renderedLines))
+		visibleLines := renderedLines[m.helpScrollOffset:endLine]
+
+		sb.WriteString(strings.Join(visibleLines, "\n") + "\n\n")
+		sb.WriteString(Gray("          Press ESC to exit help / search • j/k/↑↓ to scroll"))
+
+		content := helpStyle.Render(sb.String())
+		v := tea.NewView(content)
+		v.AltScreen = true
+		v.MouseMode = tea.MouseModeCellMotion
+		return v
 	}
 
 	t := m.curTab()
@@ -636,43 +708,7 @@ func (m model) View() tea.View {
 		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
-	// Render full help menu if open
-	if m.helpMenuOpen {
-		dialogStyle := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color(colorYellow)). // Yellow border
-			Padding(1, 4)
 
-		dialogContent := "FMTUI Help Menu\n\n" +
-			"Navigation & Panes:\n" +
-			"  j / k, Up / Down   Navigate files / scroll preview\n" +
-			"  h / l, Left / Right Go to parent dir / enter dir\n" +
-			"  tab                Switch active pane\n" +
-			"  [ / ]              Switch tab prev / next (or switch shortcuts/bookmarks tab in sidebar)\n" +
-			"  t / w              New tab / close tab\n" +
-			"  ctrl+b / \\          Toggle shortcut sidebar pane\n" +
-			"  b                  Open bookmark menu (add selected directory / CWD)\n" +
-			"  d                  Remove bookmark (only when inside Bookmarks tab)\n\n" +
-			"File Actions:\n" +
-			"  f / m              Create file / directory\n" +
-			"  a                  Toggle select all / deselect all\n" +
-			"  i                  File metadata inspector\n" +
-			"  K                  Create symlink for selected item\n" +
-			"  g                  Jump / follow symlink target\n" +
-			"  r                  Rename file or directory\n" +
-			"  d                  Delete menu (p: permanent, n: trash)\n" +
-			"  y                  Copy menu (p: path, n: name, e: ext, s: tree)\n" +
-			"  p                  Permission menu (x: chmod +x/-x)\n" +
-			"  o                  Open menu [c: VSCode CWD, C: VSCode item, r: GUI, e: $EDITOR]\n" +
-			"  .                  Toggle hidden files\n\n" +
-			"  :              	  Temporary switch to subshell (type exit or ctrl+d to return)\n" +
-			"  e                  Exit & cd to current dir in shell\n" +
-			"  q / ctrl+c         Quit application\n\n" +
-			"          Press ` or ESC to close"
-
-		dialog := dialogStyle.Render(dialogContent)
-		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
-	}
 
 	// Render Metadata Inspector dialog if open
 	if m.metadataInspectorOpen && len(t.visibleFiles()) > 0 && t.cursor >= 0 && t.cursor < len(t.visibleFiles()) {
@@ -696,7 +732,7 @@ func (m model) View() tea.View {
 			"Modified:    %s\n"+
 			"Type:        %s\n"+
 			"%s\n"+
-			color.YellowString("Press ESC or any key to close"),
+			Yellow("Press ESC or any key to close"),
 			meta.Name, meta.SizeStr,
 			meta.PermStr, meta.OwnerGroup, meta.ModTimeStr, meta.MimeOrType, symlinkLine)
 
