@@ -71,6 +71,7 @@ type model struct {
 	helpMenuOpen              bool
 	helpSearchActive          bool
 	helpScrollOffset          int
+	quickFindScrollOffset     int
 	activePane                int // 0 = Left (FM), 1 = Right (Preview)
 	stagedPaths               []string
 	stagedOp                  string

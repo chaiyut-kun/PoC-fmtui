@@ -228,6 +228,7 @@ func (m model) quickFindSearchCmd(query string) tea.Cmd {
 
 func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	maxResults := max(min(quickSearchMaxResultDefault, m.terminalHeight-8), 5)
 
 	// Handle selection navigation keys only if selection mode is active
 	if m.quickFindSelecting {
@@ -235,11 +236,17 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		case "up", "k":
 			if m.quickFindSelected > 0 {
 				m.quickFindSelected--
+				if m.quickFindSelected < m.quickFindScrollOffset {
+					m.quickFindScrollOffset = m.quickFindSelected
+				}
 			}
 			return m, nil
 		case "down", "j":
 			if m.quickFindSelected < len(m.quickFindResults)-1 {
 				m.quickFindSelected++
+				if m.quickFindSelected >= m.quickFindScrollOffset+maxResults {
+					m.quickFindScrollOffset = m.quickFindSelected - maxResults + 1
+				}
 			}
 			return m, nil
 		}
@@ -252,6 +259,7 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.quickFindInput.SetValue("")
 		m.quickFindResults = nil
 		m.quickFindSelecting = false
+		m.quickFindScrollOffset = 0
 
 	case "enter":
 		if m.quickFindSelecting {
@@ -293,10 +301,12 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.quickFindInput.SetValue("")
 			m.quickFindResults = nil
 			m.quickFindSelecting = false
+			m.quickFindScrollOffset = 0
 		} else {
 			if len(m.quickFindResults) > 0 {
 				m.quickFindSelecting = true
 				m.quickFindSelected = 0
+				m.quickFindScrollOffset = 0
 				m.quickFindInput.Blur()
 			}
 		}
@@ -315,6 +325,7 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if len(m.quickFindResults) > 0 {
 			m.quickFindSelecting = true
 			m.quickFindSelected = len(m.quickFindResults) - 1
+			m.quickFindScrollOffset = max(len(m.quickFindResults)-maxResults, 0)
 			m.quickFindInput.Blur()
 		}
 
@@ -322,6 +333,7 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if len(m.quickFindResults) > 0 {
 			m.quickFindSelecting = true
 			m.quickFindSelected = 0
+			m.quickFindScrollOffset = 0
 			m.quickFindInput.Blur()
 		}
 
@@ -330,6 +342,7 @@ func (m model) handleQuickFindKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			var cmd tea.Cmd
 			m.quickFindInput, cmd = m.quickFindInput.Update(msg)
 			m.quickFindSelected = 0
+			m.quickFindScrollOffset = 0
 			// Walk runs in a goroutine; results arrive via quickFindResultsMsg.
 			return m, tea.Batch(cmd, m.quickFindSearchCmd(m.quickFindInput.Value()))
 		}

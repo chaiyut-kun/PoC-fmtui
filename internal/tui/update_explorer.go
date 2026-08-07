@@ -80,6 +80,7 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.quickFindInput.SetValue("")
 		cmd := m.quickFindInput.Focus()
 		m.quickFindSelected = 0
+		m.quickFindScrollOffset = 0
 		m.quickFindSelecting = false
 		m.quickFindResults = nil
 		return m, tea.Batch(cmd, m.quickFindSearchCmd(""))

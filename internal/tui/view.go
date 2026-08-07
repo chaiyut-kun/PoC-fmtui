@@ -765,15 +765,23 @@ func (m model) View() tea.View {
 		} else if len(m.quickFindResults) == 0 {
 			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("No results")))
 		} else {
-			shown := m.quickFindResults
-			if len(shown) > maxResults {
-				shown = shown[:maxResults]
+			// Clamp scroll offset
+			maxScroll := max(len(m.quickFindResults)-maxResults, 0)
+			if m.quickFindScrollOffset > maxScroll {
+				m.quickFindScrollOffset = maxScroll
 			}
+			if m.quickFindScrollOffset < 0 {
+				m.quickFindScrollOffset = 0
+			}
+
+			endIdx := min(m.quickFindScrollOffset+maxResults, len(m.quickFindResults))
+			shown := m.quickFindResults[m.quickFindScrollOffset:endIdx]
 
 			// Compute available space for paths
 			pathMaxLen := max(dialogW-dialogWidthPadding-shortcutNameFieldWidth-layoutMarginOffset, minPathLen)
 
 			for i, r := range shown {
+				actualIdx := m.quickFindScrollOffset + i
 				icon := r.Icon
 				if icon == "" {
 					icon = DirIcon
@@ -786,7 +794,7 @@ func (m model) View() tea.View {
 				beautifiedPath := shrinkPath(r.Path, pathMaxLen)
 
 				line := fmt.Sprintf("  %s %s   %s", icon, namePart, Gray(beautifiedPath))
-				if m.quickFindSelecting && i == m.quickFindSelected {
+				if m.quickFindSelecting && actualIdx == m.quickFindSelected {
 					line = fmt.Sprintf("%s %s %s   %s", Cyan(CursorIcon), icon, namePart, Gray(beautifiedPath))
 				}
 				resultLines = append(resultLines, line)
