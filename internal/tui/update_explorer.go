@@ -252,8 +252,8 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+r", "U":
 		m.err = m.performRedo()
 
-	// Create file
-	case "f", "F":
+	// Create new item (file or directory)
+	case "n", "N":
 		m.err = nil
 		m.inputMode = true
 		m.fileInput.SetValue("")
@@ -352,7 +352,7 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.statusMsg = fmt.Sprintf("Created symlink: %s -> %s", linkName, selectedName)
 		}
 
-	// Move selected / Create Dir
+	// Move selected
 	case "m", "M":
 		m.err = nil
 		if len(m.selected) > 0 {
@@ -366,13 +366,6 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.stagedOp = "move"
 			m.selected = make(map[int]struct{})
 			m.statusMsg = fmt.Sprintf("Staged %d item(s) to move. Press 'v' or 'p' to paste.", len(m.stagedPaths))
-		} else {
-			m.inputMode = true
-			m.fileInput.SetValue("")
-			cmd := m.fileInput.Focus()
-			m.isCreatingDir = true
-			m.isRenaming = false
-			return m, cmd
 		}
 
 	// Copy selected / copy file path

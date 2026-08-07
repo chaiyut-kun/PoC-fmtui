@@ -18,7 +18,7 @@ var helpItems = []helpItem{
 	{key: "d", desc: "Remove bookmark (only when inside Bookmarks tab)"},
 
 	{heading: true, desc: "File Actions"},
-	{key: "f / m", desc: "Create file / directory"},
+	{key: "n", desc: "New item (name.ext = file, name or name/ = directory)"},
 	{key: "a", desc: "Toggle select all / deselect all"},
 	{key: "i", desc: "File metadata inspector"},
 	{key: "K", desc: "Create symlink for selected item"},
@@ -27,7 +27,7 @@ var helpItems = []helpItem{
 	{key: "d", desc: "Delete menu (p: permanent, n: trash)"},
 	{key: "y", desc: "Copy menu (p: path, n: name, e: ext, s: tree)"},
 	{key: "p", desc: "Permission menu (x: chmod +x/-x)"},
-	{key: "o", desc: "Open menu [c: VSCode CWD, C: VSCode item, r: GUI, e: $EDITOR]"},
+	{key: "o", desc: "Open menu [c: open code ., C: VSCode item, r: reveal file explorer, e: $EDITOR]"},
 	{key: ".", desc: "Toggle hidden files"},
 
 	{heading: true, desc: "Others"},

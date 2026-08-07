@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -166,7 +167,12 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 			filePath := filepath.Join(t.currentDir, val)
 
-			if m.isCreatingDir {
+			// Auto-detect: no extension = directory, has extension = file
+			cleanVal := strings.TrimSuffix(val, "/")
+			filePath = filepath.Join(t.currentDir, cleanVal)
+			isDir := filepath.Ext(cleanVal) == ""
+
+			if isDir {
 				err := os.Mkdir(filePath, 0755)
 				if err != nil {
 					m.err = err

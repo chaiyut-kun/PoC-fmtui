@@ -662,17 +662,15 @@ func (m model) View() tea.View {
 
 	// Render create / rename input overlay
 	if m.inputMode {
-		prompt := "Create file"
+		prompt := "New item"
 		titleText := "New item"
 		if m.isRenaming {
 			prompt = "Rename"
 			titleText = "Rename"
-		} else if m.isCreatingDir {
-			prompt = "Create directory"
 		}
 
 		dialogContent := "\n  " + prompt + ":  " + m.fileInput.View() +
-			"\n\n  " + Gray("Enter to confirm • Esc to cancel")
+			"\n\n  " + Gray("Enter to confirm • Esc to cancel • name.ext = file, name = dir")
 
 		// Width is exactly 60 characters outer width (content width is 56)
 		dialogWidth := 60
