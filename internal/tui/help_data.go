@@ -31,7 +31,7 @@ var helpItems = []helpItem{
 	{key: ".", desc: "Toggle hidden files"},
 
 	{heading: true, desc: "Others"},
-	{key: ":", desc: "Temporary switch to subshell (type exit or ctrl+d to return)"},
+	{key: ":", desc: "Open command line (type command name, tab to autocomplete)"},
 	{key: "e", desc: "Exit & cd to current dir in shell"},
 	{key: "q / ctrl+c", desc: "Quit application"},
 }

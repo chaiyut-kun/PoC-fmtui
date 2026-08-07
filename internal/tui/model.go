@@ -72,6 +72,7 @@ type model struct {
 	helpSearchActive          bool
 	helpScrollOffset          int
 	quickFindScrollOffset     int
+	cmdLineOpen               bool
 	activePane                int // 0 = Left (FM), 1 = Right (Preview)
 	stagedPaths               []string
 	stagedOp                  string
@@ -261,7 +262,7 @@ type editorFinishedMsg struct {
 func (m model) isAnyMenuOpen() bool {
 	return m.copyMenuOpen || m.bookmarkMenuOpen || m.deleteBookmarkConfirmOpen ||
 		m.deleteMenuOpen || m.permissionMenuOpen || m.openMenuOpen ||
-		m.helpMenuOpen || m.metadataInspectorOpen || m.quickFindOpen
+		m.helpMenuOpen || m.metadataInspectorOpen || m.quickFindOpen || m.cmdLineOpen
 }
 
 func setTextInputStyles(textInput *textinput.Model, placeholder string) {

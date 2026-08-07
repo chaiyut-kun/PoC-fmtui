@@ -12,6 +12,178 @@ import (
 
 func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	t := m.curTab()
+
+	if m.cmdLineOpen {
+		switch msg.String() {
+		case "enter":
+			val := strings.TrimSpace(m.fileInput.Value())
+			m.cmdLineOpen = false
+			m.fileInput.Blur()
+			m.fileInput.SetValue("")
+
+			cmdEntry, ok := findCmdSuggestion(val)
+			if !ok {
+				cmdEntry, ok = findExactCmd(val)
+			}
+			if !ok {
+				m.statusMsg = fmt.Sprintf("Unknown command: %s", val)
+				return m, nil
+			}
+
+			switch cmdEntry.name {
+			case "bookmark":
+				m.bookmarkMenuOpen = true
+			case "new_item":
+				m.err = nil
+				m.inputMode = true
+				m.fileInput.SetValue("")
+				m.isCreatingDir = false
+				m.isRenaming = false
+				return m, m.fileInput.Focus()
+			case "symlink":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.err = nil
+				selectedName := t.visibleFiles()[t.cursor]
+				targetPath := findAbsPath(t.currentDir, selectedName)
+				linkName := fmt.Sprintf("%s_link", selectedName)
+				linkPath := filepath.Join(t.currentDir, linkName)
+				if err := os.Symlink(targetPath, linkPath); err != nil {
+					m.err = err
+				} else {
+					m.pushAction(ActionRecord{Type: ActionCreate, OriginalPath: linkPath})
+					m.reloadCurrentDir()
+					m.statusMsg = fmt.Sprintf("Created symlink: %s -> %s", linkName, selectedName)
+				}
+			case "jump_symlink":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.err = nil
+				name := t.visibleFiles()[t.cursor]
+				target, isSym, isBroken := getSymlinkTarget(t.currentDir, name)
+				if !isSym {
+					m.statusMsg = "Not a symbolic link"
+					break
+				}
+				if isBroken {
+					m.err = fmt.Errorf("symlink target is broken: %s", target)
+					break
+				}
+				resolvedTarget := target
+				if !filepath.IsAbs(resolvedTarget) {
+					resolvedTarget = filepath.Join(t.currentDir, target)
+				}
+				info, err := os.Stat(resolvedTarget)
+				if err != nil {
+					m.err = err
+					break
+				}
+				if info.IsDir() {
+					entries, err := os.ReadDir(resolvedTarget)
+					if err != nil {
+						m.err = err
+						break
+					}
+					m.reLoadDir(resolvedTarget, entries)
+					m.adjustScroll()
+					m.statusMsg = fmt.Sprintf("Jumped to symlink target: %s", resolvedTarget)
+				} else {
+					targetDir := filepath.Dir(resolvedTarget)
+					targetBase := filepath.Base(resolvedTarget)
+					entries, err := os.ReadDir(targetDir)
+					if err != nil {
+						m.err = err
+						break
+					}
+					m.reLoadDir(targetDir, entries)
+					for idx, fname := range t.visibleFiles() {
+						if fname == targetBase {
+							t.cursor = idx
+							break
+						}
+					}
+					m.adjustScroll()
+					m.statusMsg = fmt.Sprintf("Jumped to symlink target file: %s", resolvedTarget)
+				}
+			case "copy":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.copyMenuOpen = true
+			case "file_permission":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.permissionMenuOpen = true
+			case "open":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.openMenuOpen = true
+			case "quit":
+				m.quitting = true
+				return m, tea.Quit
+			case "exit":
+				_ = writeTempDirFile(t.currentDir)
+				m.quitting = true
+				return m, tea.Quit
+			case "delete":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.deleteMenuOpen = true
+			case "newtab":
+				m.err = nil
+				newTab := TabState{
+					currentDir: t.currentDir,
+					filesPath:  t.filesPath,
+				}
+				m.tabs = append(m.tabs, newTab)
+				m.activeTab = len(m.tabs) - 1
+			case "toggle_shortcut":
+				m.shortcutPaneOpen = !m.shortcutPaneOpen
+			case "metadata":
+				if len(t.visibleFiles()) == 0 {
+					break
+				}
+				m.metadataInspectorOpen = true
+			case "rename":
+				if len(t.visibleFiles()) > 0 {
+					m.inputMode = true
+					m.fileInput.SetValue(t.visibleFiles()[t.cursor])
+					m.isRenaming = true
+					m.isCreatingDir = false
+					return m, m.fileInput.Focus()
+				}
+			case "hidden_file":
+				m.showHidden = !m.showHidden
+				m.reloadCurrentDir()
+				m.adjustScroll()
+			}
+			return m, nil
+
+		case "esc":
+			m.cmdLineOpen = false
+			m.fileInput.Blur()
+			m.fileInput.SetValue("")
+			return m, nil
+
+		case "tab":
+			if suggestion, ok := findCmdSuggestion(m.fileInput.Value()); ok {
+				m.fileInput.SetValue(suggestion.name)
+				m.fileInput.CursorEnd()
+			}
+			return m, nil
+
+		default:
+			var cmd tea.Cmd
+			m.fileInput, cmd = m.fileInput.Update(msg)
+			return m, cmd
+		}
+	}
+
 	if m.copyMenuOpen {
 		switch msg.String() {
 		case "p", "P":

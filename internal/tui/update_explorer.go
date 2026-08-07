@@ -438,8 +438,16 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.err = nil
 		m.helpMenuOpen = true
 
+	// Open command line
+	case ":":
+		m.cmdLineOpen = true
+		m.fileInput.SetValue("")
+		m.fileInput.Placeholder = ""
+		cmd := m.fileInput.Focus()
+		return m, cmd
+
 	// Temporary switch to shell
-	case ":", "!", "S":
+	case "!", "S":
 		shell := os.Getenv("SHELL")
 		if shell == "" {
 			if runtime.GOOS == "windows" {

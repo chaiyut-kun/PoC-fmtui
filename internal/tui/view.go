@@ -660,6 +660,47 @@ func (m model) View() tea.View {
 		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
 
+	// Render Command Line overlay
+	if m.cmdLineOpen {
+		var suggestionLine string
+		if suggestion, ok := findCmdSuggestion(m.fileInput.Value()); ok {
+			suggestionLine = Gray(fmt.Sprintf("[%s] %s", suggestion.name, suggestion.desc))
+		}
+
+		dialogContent := m.fileInput.View()
+		if suggestionLine != "" {
+			dialogContent += "\n" + suggestionLine
+		} 
+
+		dialogWidth := 60
+		dialogStyle := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color(colorGreen)).
+			Padding(0, 1).
+			Width(dialogWidth - 4)
+
+		dialog := dialogStyle.Render(dialogContent)
+
+		// Inject left-aligned title "Command:" on top border of dialog
+		dialogLines := strings.Split(dialog, "\n")
+		if len(dialogLines) > 0 {
+			dw := lipgloss.Width(dialog)
+			barWidth := dw - 2
+			titleStr := " Command: "
+			middle := lipgloss.PlaceHorizontal(
+				barWidth,
+				lipgloss.Left,
+				titleStr,
+				lipgloss.WithWhitespaceChars("─"),
+			)
+			topStr := "╭" + middle + "╮"
+			dialogLines[0] = lipgloss.NewStyle().Foreground(lipgloss.Color(colorGreen)).Render(topStr)
+			dialog = strings.Join(dialogLines, "\n")
+		}
+
+		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
+	}
+
 	// Render create / rename input overlay
 	if m.inputMode {
 		prompt := "New item"
