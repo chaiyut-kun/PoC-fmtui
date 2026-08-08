@@ -664,7 +664,7 @@ func (m model) View() tea.View {
 	if m.cmdLineOpen {
 		var suggestionLine string
 		if suggestion, ok := findCmdSuggestion(m.fileInput.Value()); ok {
-			suggestionLine = Gray(fmt.Sprintf("[%s] %s", suggestion.name, suggestion.desc))
+			suggestionLine = Gray(fmt.Sprintf("%s [%s]", suggestion.name, suggestion.desc))
 		}
 
 		dialogContent := m.fileInput.View()
@@ -703,15 +703,14 @@ func (m model) View() tea.View {
 
 	// Render create / rename input overlay
 	if m.inputMode {
-		prompt := "New item"
 		titleText := "New item"
 		if m.isRenaming {
-			prompt = "Rename"
 			titleText = "Rename"
 		}
 
-		dialogContent := "\n  " + prompt + ":  " + m.fileInput.View() +
-			"\n\n  " + Gray("Enter to confirm • Esc to cancel • name.ext = file, name = dir")
+		// renameHelp = "• name.ext = file, name = dir"
+
+		dialogContent := m.fileInput.View() + "\n" + Gray("Enter to confirm • Esc to cancel")
 
 		// Width is exactly 60 characters outer width (content width is 56)
 		dialogWidth := 60
