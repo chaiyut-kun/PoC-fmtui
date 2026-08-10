@@ -85,7 +85,8 @@ type model struct {
 	shortcutCursor            int
 	shortcuts                 []ShortcutEntry
 	bookmarks                 []ShortcutEntry
-	shortcutTab               int // 0 = Default, 1 = Bookmarks
+	shortcutSection           int // 0 = shortcuts area, 1 = bookmarks area
+	bookmarkScrollOffset      int
 	bookmarkMenuOpen          bool
 	deleteBookmarkConfirmOpen bool
 	copyJobActive             bool

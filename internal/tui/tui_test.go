@@ -969,23 +969,23 @@ func TestBookmarkActionsAndSwitching(t *testing.T) {
 		t.Fatalf("Expected activePane to be 0 after pressing '1', got %d", m.activePane)
 	}
 
-	// Default tab is 0
-	if m.shortcutTab != 0 {
-		t.Errorf("Expected default shortcutTab to be 0, got %d", m.shortcutTab)
+	// Default section is 0 (shortcuts)
+	if m.shortcutSection != 0 {
+		t.Errorf("Expected default shortcutSection to be 0, got %d", m.shortcutSection)
 	}
 
-	// 4. Press "]" to switch to user bookmarks tab
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "]"})
+	// 4. Press "tab" to switch to bookmarks section
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
-	if m.shortcutTab != 1 {
-		t.Errorf("Expected shortcutTab to be 1 after pressing ']', got %d", m.shortcutTab)
+	if m.shortcutSection != 1 {
+		t.Errorf("Expected shortcutSection to be 1 after pressing 'tab', got %d", m.shortcutSection)
 	}
 
-	// 5. Press "[" to switch back to default shortcuts
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "["})
+	// 5. Press "tab" again to switch back to shortcuts section
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
-	if m.shortcutTab != 0 {
-		t.Errorf("Expected shortcutTab to be 0 after pressing '[', got %d", m.shortcutTab)
+	if m.shortcutSection != 0 {
+		t.Errorf("Expected shortcutSection to be 0 after pressing 'tab' again, got %d", m.shortcutSection)
 	}
 
 	// 6. Test help menu open inside shortcut pane
@@ -999,9 +999,9 @@ func TestBookmarkActionsAndSwitching(t *testing.T) {
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "esc"})
 	m = updatedModel.(model)
 
-	// 7. Test deleting a bookmark from the Bookmarks tab
-	// Go to tab 1
-	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "]"})
+	// 7. Test deleting a bookmark from the Bookmarks section
+	// Switch to bookmarks section with tab
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "tab"})
 	m = updatedModel.(model)
 	// Press "d" to trigger delete bookmark dialog
 	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "d"})

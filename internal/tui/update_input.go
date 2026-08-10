@@ -31,44 +31,68 @@ func (m model) handleShortcutKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.err = nil
 			m.helpMenuOpen = true
 		case "d", "D":
-			if m.shortcutTab == 1 && len(m.bookmarks) > 0 {
+			if m.shortcutSection == 1 && len(m.bookmarks) > 0 {
 				m.err = nil
 				m.deleteBookmarkConfirmOpen = true
 			}
-		case "up", "k":
-			limit := len(m.shortcuts) - 1
-			if m.shortcutTab == 1 {
-				limit = len(m.bookmarks) - 1
+		case "tab":
+			if m.shortcutSection == 0 {
+				m.shortcutSection = 1
+			} else {
+				m.shortcutSection = 0
 			}
-			if limit > 0 {
-				if m.shortcutCursor > 0 {
-					m.shortcutCursor--
-				} else {
-					m.shortcutCursor = limit
+			m.shortcutCursor = 0
+			m.bookmarkScrollOffset = 0
+		case "up", "k":
+			if m.shortcutSection == 0 {
+				limit := len(m.shortcuts) - 1
+				if limit > 0 {
+					if m.shortcutCursor > 0 {
+						m.shortcutCursor--
+					} else {
+						m.shortcutCursor = limit
+					}
+				}
+			} else {
+				limit := len(m.bookmarks) - 1
+				if limit > 0 {
+					if m.shortcutCursor > 0 {
+						m.shortcutCursor--
+					} else {
+						m.shortcutCursor = limit
+						m.bookmarkScrollOffset = max(limit-1, 0)
+					}
+					// scroll up if cursor above viewport
+					if m.shortcutCursor < m.bookmarkScrollOffset {
+						m.bookmarkScrollOffset = m.shortcutCursor
+					}
 				}
 			}
 		case "down", "j":
-			limit := len(m.shortcuts) - 1
-			if m.shortcutTab == 1 {
-				limit = len(m.bookmarks) - 1
-			}
-			if limit > 0 {
-				if m.shortcutCursor < limit {
-					m.shortcutCursor++
-				} else {
-					m.shortcutCursor = 0
+			if m.shortcutSection == 0 {
+				limit := len(m.shortcuts) - 1
+				if limit > 0 {
+					if m.shortcutCursor < limit {
+						m.shortcutCursor++
+					} else {
+						m.shortcutCursor = 0
+					}
+				}
+			} else {
+				limit := len(m.bookmarks) - 1
+				if limit > 0 {
+					if m.shortcutCursor < limit {
+						m.shortcutCursor++
+					} else {
+						m.shortcutCursor = 0
+						m.bookmarkScrollOffset = 0
+					}
 				}
 			}
-		case "[":
-			m.shortcutTab = 0
-			m.shortcutCursor = 0
-		case "]":
-			m.shortcutTab = 1
-			m.shortcutCursor = 0
 		case "enter", "right", "l":
 			var targetDir string
 			var targetName string
-			if m.shortcutTab == 0 {
+			if m.shortcutSection == 0 {
 				if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.shortcuts) {
 					targetDir = m.shortcuts[m.shortcutCursor].Path
 					targetName = m.shortcuts[m.shortcutCursor].Name

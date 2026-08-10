@@ -24,7 +24,7 @@ const (
 	defaultScreenHeight   = 20
 	minBoxHeight          = 3
 	minLeftPaneWidth      = 10
-	minShortcutWidth      = 14
+	minShortcutWidth      = 10
 	shortcutWidthRatio    = 4
 	openShortcutPaneRatio = 2
 
@@ -36,7 +36,6 @@ const (
 	searchBoxPadding    = 2
 	tabBorderOffset     = 4
 	paneBorderPadding   = 2
-	minWidthForFullTabs = 27
 
 	shortcutPathPadding = 4
 	minBarWidth         = 5
@@ -292,50 +291,61 @@ func (m model) View() tea.View {
 	// 0. Create shortcut pane (if open)
 	var shortcutBox string
 	if m.shortcutPaneOpen {
-		var shortcutText string
-		var activeShortcuts []ShortcutEntry
-		if m.shortcutTab == 0 {
-			activeShortcuts = m.shortcuts
-		} else {
-			activeShortcuts = m.bookmarks
+		var lines []string
+
+		// --- Shortcuts section ---
+		for i, s := range m.shortcuts {
+			cursor := "  "
+			label := fmt.Sprintf("%s%s", cursor, s.Name)
+			if m.shortcutSection == 0 && i == m.shortcutCursor {
+				label = BgCyan(Black(fmt.Sprintf("%s%s", CursorIcon+" ", s.Name)))
+			}
+			lines = append(lines, label)
 		}
 
-		if len(activeShortcuts) == 0 {
-			shortcutText = " (No bookmarks)\n Press 'b' to add"
+		// --- Divider ---
+		sepWidth := max(shortcutWidth-paneBorderPadding, minBarWidth)
+		lines = append(lines, Gray(strings.Repeat("─", sepWidth)))
+
+		// --- Bookmarks section ---
+		// available lines for bookmarks = total height - shortcuts - 1 divider - 2 border
+		availBmLines := boxHeight - len(m.shortcuts) - 1 - paneBorderPadding
+		if availBmLines < 0 {
+			availBmLines = 0
+		}
+
+		// Clamp scroll
+		maxBmScroll := max(len(m.bookmarks)-availBmLines, 0)
+		bmScroll := m.bookmarkScrollOffset
+		if bmScroll > maxBmScroll {
+			bmScroll = maxBmScroll
+		}
+
+		visibleBm := m.bookmarks
+		if bmScroll < len(m.bookmarks) {
+			visibleBm = m.bookmarks[bmScroll:]
 		} else {
-			for i, s := range activeShortcuts {
-				cursor := "  "
-				if i == m.shortcutCursor {
-					// use space for icon gap with cursor
-					cursor = CursorIcon + " "
-				}
-				label := fmt.Sprintf("%s%s  %s", cursor, s.Icon, s.Name)
-				if i == m.shortcutCursor {
-					label = BgCyan(Black(fmt.Sprintf("%s%s  %s", cursor, s.Icon, s.Name)))
-				}
-				shortcutText += label + "\n"
-			}
-			shortcutText = strings.TrimSuffix(shortcutText, "\n")
+			visibleBm = nil
+		}
+		if len(visibleBm) > availBmLines {
+			visibleBm = visibleBm[:availBmLines]
+		}
 
-			// ponytail: Append full path of active shortcut at the bottom of the pane
-			if m.shortcutCursor >= 0 && m.shortcutCursor < len(activeShortcuts) {
-				selectedPath := activeShortcuts[m.shortcutCursor].Path
-				maxWidth := max(shortcutWidth-shortcutPathPadding, minBarWidth)
-				truncatedPath := truncatePathLeft(selectedPath, maxWidth)
-				sep := strings.Repeat("─", shortcutWidth-paneBorderPadding)
-
-				linesCount := strings.Count(shortcutText, "\n") + 1
-				targetHeight := boxHeight - paneBorderPadding
-				paddingNeeded := targetHeight - linesCount - paneBorderPadding // subtract for sep and path line
-
-				if paddingNeeded > 0 {
-					shortcutText += strings.Repeat("\n", paddingNeeded)
-				} else {
-					shortcutText += "\n"
+		if len(m.bookmarks) == 0 {
+			lines = append(lines, Gray(" (No bookmarks)"))
+			lines = append(lines, Gray(" Press 'b' to add"))
+		} else {
+			for i, bm := range visibleBm {
+				idx := i + bmScroll
+				label := fmt.Sprintf("  %s", bm.Name)
+				if m.shortcutSection == 1 && idx == m.shortcutCursor {
+					label = BgCyan(Black(fmt.Sprintf("%s%s", CursorIcon+" ", bm.Name)))
 				}
-				shortcutText += fmt.Sprintf("%s\n %s", Gray(sep), Yellow(truncatedPath))
+				lines = append(lines, label)
 			}
 		}
+
+		shortcutText := strings.Join(lines, "\n")
 
 		shortcutStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
@@ -345,24 +355,10 @@ func (m model) View() tea.View {
 
 		shortcutBox = shortcutStyle.Render(shortcutText)
 
-		// Overlay title on border depending on tab and width
+		// Overlay title on border
 		scLines := strings.Split(shortcutBox, "\n")
 		if len(scLines) > 0 {
-			var title string
-			if shortcutWidth-paneBorderPadding >= minWidthForFullTabs {
-				if m.shortcutTab == 0 {
-					title = " [Shortcuts] │ Bookmarks "
-				} else {
-					title = " Shortcuts │ [Bookmarks] "
-				}
-			} else {
-				if m.shortcutTab == 0 {
-					title = " [Shortcuts] "
-				} else {
-					title = " [Bookmarks] "
-				}
-			}
-			scLines[0] = createTopBorder(title, shortcutWidth, shortcutBorderColor, "1")
+			scLines[0] = createTopBorder(" Shortcuts ", shortcutWidth, shortcutBorderColor, "1")
 			shortcutBox = strings.Join(scLines, "\n")
 		}
 	}

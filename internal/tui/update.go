@@ -61,8 +61,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.helpScrollOffset--
 				}
 			} else if m.activePane == 0 && m.shortcutPaneOpen {
-				if m.shortcutCursor > 0 {
-					m.shortcutCursor--
+				if m.shortcutSection == 0 {
+					if m.shortcutCursor > 0 {
+						m.shortcutCursor--
+					}
+				} else {
+					if m.shortcutCursor > 0 {
+						m.shortcutCursor--
+						if m.shortcutCursor < m.bookmarkScrollOffset {
+							m.bookmarkScrollOffset = m.shortcutCursor
+						}
+					}
 				}
 			} else if m.activePane == 1 {
 				if t.cursor > 0 {
@@ -80,12 +89,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.helpMenuOpen {
 				m.helpScrollOffset++
 			} else if m.activePane == 0 && m.shortcutPaneOpen {
-				limit := len(m.shortcuts) - 1
-				if m.shortcutTab == 1 {
-					limit = len(m.bookmarks) - 1
-				}
-				if m.shortcutCursor < limit {
-					m.shortcutCursor++
+				if m.shortcutSection == 0 {
+					limit := len(m.shortcuts) - 1
+					if m.shortcutCursor < limit {
+						m.shortcutCursor++
+					}
+				} else {
+					limit := len(m.bookmarks) - 1
+					if m.shortcutCursor < limit {
+						m.shortcutCursor++
+					}
 				}
 			} else if m.activePane == 1 {
 				if t.cursor < len(t.visibleFiles())-1 {
