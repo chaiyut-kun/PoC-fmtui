@@ -139,7 +139,7 @@ func (m model) View() tea.View {
 
 	sShortcutWidth := 0
 	if m.shortcutPaneOpen {
-		sShortcutWidth = max(sWidth/shortcutWidthRatio, minShortcutWidth)
+		sShortcutWidth = max(sWidth/shortcutWidthRatio-4, minShortcutWidth)
 	}
 	var sLeftWidth int
 	if m.shortcutPaneOpen {
@@ -255,7 +255,8 @@ func (m model) View() tea.View {
 	// Calculate shortcut pane width
 	shortcutWidth := 0
 	if m.shortcutPaneOpen {
-		shortcutWidth = max(width/shortcutWidthRatio, minShortcutWidth)
+		// 8 is reduce unit
+		shortcutWidth = max(width/shortcutWidthRatio-8, minShortcutWidth)
 	}
 
 	var leftWidth, rightWidth int
@@ -296,9 +297,9 @@ func (m model) View() tea.View {
 		// --- Shortcuts section ---
 		for i, s := range m.shortcuts {
 			cursor := "  "
-			label := fmt.Sprintf("%s%s", cursor, s.Name)
+			label := fmt.Sprintf("%s%s %s", cursor, s.Icon, s.Name)
 			if m.shortcutSection == 0 && i == m.shortcutCursor {
-				label = BgCyan(Black(fmt.Sprintf("%s%s", CursorIcon+" ", s.Name)))
+				label = BgCyan(Black(fmt.Sprintf("%s %s %s", CursorIcon, s.Icon, s.Name)))
 			}
 			lines = append(lines, label)
 		}
