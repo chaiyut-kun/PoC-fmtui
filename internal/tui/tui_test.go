@@ -1696,4 +1696,99 @@ func TestShortcutNavigationKeepPaneOpen(t *testing.T) {
 	}
 }
 
+func TestNewItemDetection(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test_new_item_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	cases := []struct {
+		input   string
+		wantDir bool
+	}{
+		{"notes", false},         // no extension → FILE (changed behavior)
+		{"README", false},        // no extension → FILE (changed behavior)
+		{"mydir/", true},         // trailing slash → directory
+		{"src/", true},           // trailing slash → directory
+		{"notes.txt", false},     // has extension → file
+		{"script.sh", false},     // has extension → file
+	}
+
+	for _, tc := range cases {
+		m := InitialModel()
+		m.terminalWidth = 80
+		m.terminalHeight = 24
+		m.curTab().currentDir = tempDir
+		m.inputMode = true
+		m.fileInput.SetValue(tc.input)
+		updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "enter"})
+		m = updatedModel.(model)
+
+		cleanName := strings.TrimSuffix(tc.input, "/")
+		path := filepath.Join(tempDir, cleanName)
+		fi, err := os.Stat(path)
+		if err != nil {
+			t.Errorf("input=%q: expected %q to exist, got error: %v", tc.input, path, err)
+			continue
+		}
+		if fi.IsDir() != tc.wantDir {
+			t.Errorf("input=%q: wantDir=%v but got IsDir=%v", tc.input, tc.wantDir, fi.IsDir())
+		}
+		// cleanup for next case
+		os.RemoveAll(path)
+	}
+}
+
+func TestRenameNoChange(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "test_rename_nochange_*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	existingFile := "original.txt"
+	os.WriteFile(filepath.Join(tempDir, existingFile), []byte("data"), 0644)
+
+	m := InitialModel()
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.curTab().currentDir = tempDir
+	m.curTab().filesPath = []string{existingFile}
+	m.curTab().cursor = 0
+
+	// Press "r" to open rename input
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "r"})
+	m = updatedModel.(model)
+	if !m.isRenaming || !m.inputMode {
+		t.Fatal("Expected isRenaming=true and inputMode=true after 'r'")
+	}
+
+	// Do NOT change the value — confirm with Enter as-is (same name)
+	// fileInput should already be prefilled with the existing name
+	if m.fileInput.Value() != existingFile {
+		t.Fatalf("Expected fileInput to be prefilled with %q, got %q", existingFile, m.fileInput.Value())
+	}
+
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "enter"})
+	m = updatedModel.(model)
+
+	// Should not be in rename mode anymore
+	if m.isRenaming {
+		t.Error("Expected isRenaming=false after enter")
+	}
+	if m.inputMode {
+		t.Error("Expected inputMode=false after enter")
+	}
+	// Original file should still exist — rename to same path is a no-op
+	if _, err := os.Stat(filepath.Join(tempDir, existingFile)); err != nil {
+		t.Errorf("Expected %q to still exist after same-name rename: %v", existingFile, err)
+	}
+	// No error set
+	if m.err != nil {
+		t.Errorf("Expected no error, got: %v", m.err)
+	}
+}
+
+
 

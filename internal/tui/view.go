@@ -403,7 +403,7 @@ func (m model) View() tea.View {
 	}
 
 	// Render process status and clipboard panes at bottom
-	processWidth := leftWidth / 3
+	processWidth := (leftWidth / 3) + 10
 	clipboardWidth := leftWidth - processWidth
 
 	var processContent string

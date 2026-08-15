@@ -18,7 +18,7 @@ var helpItems = []helpItem{
 	{key: "d", desc: "Remove bookmark (only when inside Bookmarks tab)"},
 
 	{heading: true, desc: "File Actions"},
-	{key: "n", desc: "New item (name.ext = file, name or name/ = directory)"},
+	{key: "n", desc: "New item (name/ = directory, else = file)"},
 	{key: "a", desc: "Toggle select all / deselect all"},
 	{key: "i", desc: "File metadata inspector"},
 	{key: "K", desc: "Create symlink for selected item"},
