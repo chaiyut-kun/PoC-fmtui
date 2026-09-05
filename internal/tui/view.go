@@ -184,6 +184,13 @@ func (m model) View() tea.View {
 	files := t.visibleFiles()
 	endIdx := min(t.scrollOffset+maxVisible, len(files))
 
+	// Max width for displayName = leftWidth minus prefix overhead minus border
+	// Prefix: cursor(1) + space(1) + marker(1) + space(1) + icon(~2) + space(1) + ItemEndSpace(1) + border(2)
+	maxDisplayWidth := sLeftWidth - 10
+	if maxDisplayWidth < 10 {
+		maxDisplayWidth = 10
+	}
+
 	for i := t.scrollOffset; i < endIdx; i++ {
 		list := files[i]
 
@@ -195,6 +202,9 @@ func (m model) View() tea.View {
 				displayName = fmt.Sprintf("%s -> %s", list, target)
 			}
 		}
+
+		// Truncate long names to prevent line wrapping
+		displayName = truncateFileName(displayName, maxDisplayWidth)
 
 		icon, fg, bg := m.CheckDirFilesExt(list)
 

@@ -508,3 +508,43 @@ func truncatePathLeft(path string, maxWidth int) string {
 	}
 	return "..." + path[len(path)-(maxWidth-3):]
 }
+
+// truncateFileName truncates a display name to fit within maxWidth.
+// For files with extensions, preserves the extension and inserts "..."
+// in the middle of the base name. For directories and dotfiles, truncates
+// from the end.
+func truncateFileName(name string, maxWidth int) string {
+	runes := []rune(name)
+	if len(runes) <= maxWidth {
+		return name
+	}
+	if maxWidth < 5 {
+		if len(runes) > maxWidth {
+			return string(runes[:maxWidth])
+		}
+		return name
+	}
+
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+	extRunes := []rune(ext)
+
+	// If extension is too long or no meaningful extension, just truncate with "..."
+	if ext == "" || len(extRunes) > maxWidth/2 {
+		return string(runes[:maxWidth-3]) + "..."
+	}
+
+	// Available space for base name (with "..." inserted)
+	availBase := maxWidth - len(extRunes) - 3 // 3 for "..."
+	if availBase < 2 {
+		return string(runes[:maxWidth-3]) + "..."
+	}
+
+	baseRunes := []rune(base)
+	prefixLen := availBase / 2
+	suffixLen := availBase - prefixLen
+	if suffixLen > len(baseRunes) {
+		suffixLen = len(baseRunes)
+	}
+	return string(baseRunes[:prefixLen]) + "..." + string(baseRunes[len(baseRunes)-suffixLen:]) + ext
+}

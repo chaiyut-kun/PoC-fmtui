@@ -1790,5 +1790,45 @@ func TestRenameNoChange(t *testing.T) {
 	}
 }
 
+func TestTruncateFileName(t *testing.T) {
+	cases := []struct {
+		name     string
+		maxWidth int
+		want     string
+	}{
+		// No truncation needed
+		{"short.txt", 30, "short.txt"},
+		{"mydir", 30, "mydir"},
 
+		// Long file with extension — preserves extension
+		{"my-super-long-filename-for-testing.txt", 25, "my-super-...r-testing.txt"},
 
+		// Long directory name — no extension, truncates at end
+		{"very-long-directory-name-that-keeps-going", 25, "very-long-directory-na..."},
+
+		// Dotfile (no meaningful base extension split)
+		{".very-long-hidden-config-file", 20, ".very-long-hidden..."},
+
+		// Very short maxWidth
+		{"longname.txt", 4, "long"},
+
+		// Exact fit
+		{"exact.txt", 9, "exact.txt"},
+
+		// Symlink display format
+		{"long-dir -> /some/very/long/target/path", 30, "long-dir -> /some/very/long..."},
+	}
+
+	for _, tc := range cases {
+		got := truncateFileName(tc.name, tc.maxWidth)
+		if len([]rune(got)) > tc.maxWidth {
+			t.Errorf("truncateFileName(%q, %d) = %q (len=%d), exceeds maxWidth",
+				tc.name, tc.maxWidth, got, len([]rune(got)))
+		}
+		// For cases where we know the exact expected output
+		if tc.want != "" && got != tc.want {
+			t.Errorf("truncateFileName(%q, %d) = %q, want %q",
+				tc.name, tc.maxWidth, got, tc.want)
+		}
+	}
+}
