@@ -31,14 +31,14 @@ const (
 	leftPaneRatioNumerator   = 1
 	leftPaneRatioDenominator = 2
 
-	minPathLen          = 15
-	pathHeaderPadding   = 2
-	searchBoxPadding    = 2
-	tabBorderOffset     = 4
-	paneBorderPadding   = 2
+	minPathLen        = 15
+	pathHeaderPadding = 2
+	searchBoxPadding  = 2
+	tabBorderOffset   = 4
+	paneBorderPadding = 2
 
-	shortcutPathPadding = 4
-	minBarWidth         = 5
+	// shortcutPathPadding = 4
+	minBarWidth = 5
 
 	dialogWidthPadding     = 8
 	shortcutNameFieldWidth = 25
@@ -57,7 +57,7 @@ func (m model) View() tea.View {
 	if m.helpMenuOpen {
 		width := m.terminalWidth
 		height := m.terminalHeight
-		
+
 		helpStyle := lipgloss.NewStyle().
 			Width(width).
 			Height(height).
@@ -186,10 +186,7 @@ func (m model) View() tea.View {
 
 	// Max width for displayName = leftWidth minus prefix overhead minus border
 	// Prefix: cursor(1) + space(1) + marker(1) + space(1) + icon(~2) + space(1) + ItemEndSpace(1) + border(2)
-	maxDisplayWidth := sLeftWidth - 10
-	if maxDisplayWidth < 10 {
-		maxDisplayWidth = 10
-	}
+	maxDisplayWidth := max(sLeftWidth-10, 10)
 
 	for i := t.scrollOffset; i < endIdx; i++ {
 		list := files[i]
@@ -214,15 +211,18 @@ func (m model) View() tea.View {
 		}
 		selectMarker := " "
 		if _, ok := m.selected[i]; ok {
-			selectMarker = Yellow(Marker)
+			if t.cursor == i {
+				selectMarker = Marker
+			} else {
+				selectMarker = Green(Marker)
+			}
 		}
 
 		if t.cursor == i {
-			rowText := fmt.Sprintf("%s %s %s %s%s", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
+			rowText := fmt.Sprintf("%s %s %s %s", cursorSymbol, selectMarker, icon, displayName)
 			sb.WriteString(bg(Black(rowText)) + "\n")
 		} else {
-			rowText := fmt.Sprintf("%s%s %s %s%s", cursorSymbol, selectMarker, icon, displayName, ItemEndSpace)
-			sb.WriteString(" " + fg(rowText) + "\n")
+			sb.WriteString(fmt.Sprintf("%s %s %s\n", cursorSymbol, selectMarker, fg(icon+" "+displayName)))
 		}
 	}
 
@@ -677,7 +677,7 @@ func (m model) View() tea.View {
 		dialogContent := m.fileInput.View()
 		if suggestionLine != "" {
 			dialogContent += "\n" + suggestionLine
-		} 
+		}
 
 		dialogWidth := 60
 		dialogStyle := lipgloss.NewStyle().
@@ -752,8 +752,6 @@ func (m model) View() tea.View {
 
 		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
 	}
-
-
 
 	// Render Metadata Inspector dialog if open
 	if m.metadataInspectorOpen && len(t.visibleFiles()) > 0 && t.cursor >= 0 && t.cursor < len(t.visibleFiles()) {

@@ -46,7 +46,8 @@ const ItemEndSpace = " "
 const (
 	CursorIcon = "▶"
 	SearchIcon = "\ue68f"
-	Marker     = "*"
+	Marker     = "\uf14a"
+	UnMaker    = "\ue640"
 
 	DirIcon     = "\uf4d3"
 	FileIcon    = "\uf15b"
