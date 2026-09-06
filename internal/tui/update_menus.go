@@ -144,6 +144,9 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				m.activeTab = len(m.tabs) - 1
 			case "toggle_shortcut":
 				m.shortcutPaneOpen = !m.shortcutPaneOpen
+				if !m.shortcutPaneOpen && m.activePane == 0 {
+					m.activePane = 1
+				}
 			case "metadata":
 				if len(t.visibleFiles()) == 0 {
 					break

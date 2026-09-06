@@ -849,8 +849,8 @@ func TestShortcutPaneAction(t *testing.T) {
 	if !m.shortcutPaneOpen {
 		t.Errorf("Expected shortcutPaneOpen to be true after pressing '\\' again")
 	}
-	if m.activePane != 0 {
-		t.Errorf("Expected activePane to be auto-focused to 0 when opening with '\\', got %d", m.activePane)
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to remain 1 (File Explorer) when opening with '\\', got %d", m.activePane)
 	}
 
 	// Focus the shortcut pane by pressing "1"
@@ -1832,3 +1832,51 @@ func TestTruncateFileName(t *testing.T) {
 		}
 	}
 }
+
+func TestToggleShortcutPreservesActivePane(t *testing.T) {
+	m := InitialModel()
+	m.shortcutPaneOpen = true
+	m.activePane = 1 // File Explorer
+
+	// 1. Toggle off from pane 1 -> activePane stays 1
+	updatedModel, _ := m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	m = updatedModel.(model)
+	if m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be false")
+	}
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to stay 1, got %d", m.activePane)
+	}
+
+	// 2. Toggle on from pane 1 -> activePane stays 1
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "\\"})
+	m = updatedModel.(model)
+	if !m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be true")
+	}
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to stay 1 when toggling on, got %d", m.activePane)
+	}
+
+	// 3. Switch to pane 2 (Preview), toggle off -> on -> activePane stays 2
+	m.activePane = 2
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "\\"})
+	m = updatedModel.(model) // off
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "\\"})
+	m = updatedModel.(model) // on
+	if m.activePane != 2 {
+		t.Errorf("Expected activePane to stay 2, got %d", m.activePane)
+	}
+
+	// 4. Focus pane 0, toggle off -> switches to pane 1
+	m.activePane = 0
+	updatedModel, _ = m.Update(tea.KeyPressMsg{Text: "ctrl+b"})
+	m = updatedModel.(model)
+	if m.shortcutPaneOpen {
+		t.Errorf("Expected shortcutPaneOpen to be false")
+	}
+	if m.activePane != 1 {
+		t.Errorf("Expected activePane to switch to 1 when pane 0 closed, got %d", m.activePane)
+	}
+}
+
