@@ -222,7 +222,7 @@ func (m model) View() tea.View {
 			rowText := fmt.Sprintf("%s %s %s %s", cursorSymbol, selectMarker, icon, displayName)
 			sb.WriteString(bg(Black(rowText)) + "\n")
 		} else {
-			sb.WriteString(fmt.Sprintf("%s %s %s\n", cursorSymbol, selectMarker, fg(icon+" "+displayName)))
+			sb.WriteString(fmt.Sprintf("%s %s %s\n", cursorSymbol, selectMarker, fg(icon+ItemEndSpace+displayName)))
 		}
 	}
 

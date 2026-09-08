@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fmtui · Conceptual System Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root[data-theme="light"] {
+      --color-paper: #f8f9fa; --color-paper-2: #f1f3f5; --color-surface: #ffffff;
+      --color-ink: #1e2329; --color-muted: #495057; --color-soft: #868e96;
+      --color-rule: rgba(30,35,41,0.12);
+      --color-accent: #e8590c; --color-accent-tint: rgba(232,89,12,0.08);
+      --color-link: #1c7ed6; --color-link-tint: rgba(28,126,214,0.08);
+      --color-green: #2b8a3e; --color-green-tint: rgba(43,138,62,0.08);
+      --color-purple: #7048e8; --color-purple-tint: rgba(112,72,232,0.08);
+      --dot-fill: rgba(30,35,41,0.08);
+    }
+    :root[data-theme="dark"] {
+      --color-paper: #121417; --color-paper-2: #1a1d23; --color-surface: #22262e;
+      --color-ink: #e9ecef; --color-muted: #adb5bd; --color-soft: #6c757d;
+      --color-rule: rgba(233,236,239,0.12);
+      --color-accent: #ff922b; --color-accent-tint: rgba(255,146,43,0.12);
+      --color-link: #4dabf7; --color-link-tint: rgba(77,171,247,0.12);
+      --color-green: #51cf66; --color-green-tint: rgba(81,207,102,0.12);
+      --color-purple: #9775fa; --color-purple-tint: rgba(151,117,250,0.12);
+      --dot-fill: rgba(233,236,239,0.08);
+    }
+    body { font-family: 'Geist', system-ui, sans-serif; background: var(--color-paper); min-height: 100vh; padding: 2.5rem 2rem; color: var(--color-ink); transition: background 0.2s, color 0.2s; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .nav-links { font-family: 'Geist Mono', monospace; font-size: 0.75rem; display: flex; gap: 1rem; }
+    .nav-links a { color: var(--color-muted); text-decoration: none; border-bottom: 1px solid var(--color-rule); }
+    .nav-links a:hover { color: var(--color-accent); }
+    .theme-toggle { background: var(--color-surface); border: 1px solid var(--color-rule); padding: 0.35rem 0.75rem; border-radius: 4px; color: var(--color-ink); font-family: 'Geist Mono', monospace; font-size: 0.75rem; cursor: pointer; }
+    .header { margin-bottom: 2rem; }
+    .header-eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', serif; font-size: clamp(2rem, 3vw + 1rem, 2.75rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.5rem; }
+    .subtitle { font-size: 1rem; line-height: 1.5; color: var(--color-muted); max-width: 65ch; }
+    .diagram-container { background: var(--color-paper-2); border-radius: 8px; border: 1px solid var(--color-rule); padding: 1.5rem; overflow-x: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+    svg { width: 100%; min-width: 960px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1.5rem; }
+    @media (max-width: 900px) { .cards { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 550px) { .cards { grid-template-columns: 1fr; } }
+    .card { background: var(--color-surface); border-radius: 6px; border: 1px solid var(--color-rule); padding: 1.25rem; }
+    .card .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-soft); margin-bottom: 0.5rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-rule); }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card h3 { font-size: 0.95rem; font-weight: 600; }
+    .card p { color: var(--color-muted); font-size: 0.825rem; line-height: 1.5; }
+    .footer { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--color-rule); font-family: 'Geist Mono', monospace; font-size: 0.75rem; color: var(--color-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-nav">
+      <div class="nav-links">
+        <a href="../README.md">← Diagrams Root</a>
+        <a href="../md/01_system_architecture.md">View Markdown/Mermaid</a>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark / Light</button>
+    </div>
+
+    <div class="header">
+      <p class="header-eyebrow">01 · System Architecture (Conceptual)</p>
+      <h1>Layered Subsystem Architecture</h1>
+      <p class="subtitle">A clear four-tier separation of concerns: Presentation, Application & Orchestration, Domain Services, and Infrastructure Integration with the host environment.</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid-dots" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" fill="var(--dot-fill)"/>
+          </pattern>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--color-muted)"/></marker>
+          <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--color-accent)"/></marker>
+          <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--color-link)"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="var(--color-paper)" rx="6"/>
+        <rect width="100%" height="100%" fill="url(#grid-dots)" opacity="0.8"/>
+
+        <!-- User Actor Node -->
+        <rect x="50" y="30" width="900" height="48" rx="6" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1.2"/>
+        <text x="500" y="59" fill="var(--color-ink)" font-size="14" font-weight="600" text-anchor="middle">👤 Terminal User (Keyboard & Mouse Events)</text>
+
+        <!-- Downward arrows from User to TUI -->
+        <line x1="500" y1="78" x2="500" y2="108" stroke="var(--color-muted)" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- Tier 1: Presentation Layer -->
+        <rect x="50" y="110" width="900" height="105" rx="8" fill="var(--color-link-tint)" stroke="var(--color-link)" stroke-width="1.2"/>
+        <text x="70" y="132" fill="var(--color-link)" font-size="10" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">TIER 1 · PRESENTATION LAYER</text>
+        
+        <g transform="translate(70, 145)">
+          <rect x="0" y="0" width="260" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="130" y="24" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">Split-Pane Layout Manager</text>
+          <text x="130" y="40" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Sidebar · Explorer · Preview</text>
+
+          <rect x="295" y="0" width="260" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="425" y="24" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">UI Rendering Engine</text>
+          <text x="425" y="40" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Component Tree & Styling</text>
+
+          <rect x="590" y="0" width="270" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="725" y="24" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">Modal Overlay System</text>
+          <text x="725" y="40" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Dialogs · Inspectors · Prompts</text>
+        </g>
+
+        <!-- Downward arrow Tier 1 -> Tier 2 -->
+        <line x1="500" y1="215" x2="500" y2="238" stroke="var(--color-muted)" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- Tier 2: Application Layer -->
+        <rect x="50" y="240" width="900" height="105" rx="8" fill="var(--color-purple-tint)" stroke="var(--color-purple)" stroke-width="1.2"/>
+        <text x="70" y="262" fill="var(--color-purple)" font-size="10" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">TIER 2 · APPLICATION & ORCHESTRATION LAYER</text>
+
+        <g transform="translate(70, 275)">
+          <rect x="0" y="0" width="260" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="130" y="24" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">Event & Input Coordinator</text>
+          <text x="130" y="40" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Key Dispatch · Window Resize</text>
+
+          <rect x="295" y="0" width="260" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="425" y="24" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">Workspace & Tab Controller</text>
+          <text x="425" y="40" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Active Sessions & Cursor States</text>
+
+          <rect x="590" y="0" width="270" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="725" y="24" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">Background Task Coordinator</text>
+          <text x="725" y="40" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Async Jobs · Progress Telemetry</text>
+        </g>
+
+        <!-- Downward arrow Tier 2 -> Tier 3 -->
+        <line x1="500" y1="345" x2="500" y2="368" stroke="var(--color-muted)" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- Tier 3: Domain Services Layer -->
+        <rect x="50" y="370" width="900" height="105" rx="8" fill="var(--color-accent-tint)" stroke="var(--color-accent)" stroke-width="1.2"/>
+        <text x="70" y="392" fill="var(--color-accent)" font-size="10" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">TIER 3 · CORE DOMAIN SERVICES</text>
+
+        <g transform="translate(70, 405)">
+          <rect x="0" y="0" width="195" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="97" y="24" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">File Operations Service</text>
+          <text x="97" y="40" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">CRUD · Safe Trash · Cut/Paste</text>
+
+          <rect x="220" y="0" width="195" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="317" y="24" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">Search & Discovery</text>
+          <text x="317" y="40" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Live Filter · Ranked Quick Find</text>
+
+          <rect x="440" y="0" width="195" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="537" y="24" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">History & Rollback</text>
+          <text x="537" y="40" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Atomic Undo / Redo Journal</text>
+
+          <rect x="660" y="0" width="200" height="52" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="760" y="24" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">Bookmarks & Shortcuts</text>
+          <text x="760" y="40" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Pinned Paths & Fast Jump</text>
+        </g>
+
+        <!-- Downward arrow Tier 3 -> Tier 4 -->
+        <line x1="500" y1="475" x2="500" y2="498" stroke="var(--color-muted)" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- Tier 4: Platform & OS Layer -->
+        <rect x="50" y="500" width="900" height="95" rx="8" fill="var(--color-green-tint)" stroke="var(--color-green)" stroke-width="1.2"/>
+        <text x="70" y="522" fill="var(--color-green)" font-size="10" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.12em">TIER 4 · HOST PLATFORM & OS INTEGRATION</text>
+
+        <g transform="translate(70, 532)">
+          <rect x="0" y="0" width="195" height="46" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="97" y="22" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">Host Filesystem (POSIX)</text>
+          <text x="97" y="36" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Directory I/O & OS Trash</text>
+
+          <rect x="220" y="0" width="195" height="46" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="317" y="22" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">Subprocess Execution</text>
+          <text x="317" y="36" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">$EDITOR & Interactive Subshell</text>
+
+          <rect x="440" y="0" width="195" height="46" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="537" y="22" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">System Clipboard</text>
+          <text x="537" y="36" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Path & Content Buffer</text>
+
+          <rect x="660" y="0" width="200" height="46" rx="4" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="760" y="22" fill="var(--color-ink)" font-size="11" font-weight="600" text-anchor="middle">Shell Synchronization</text>
+          <text x="760" y="36" fill="var(--color-soft)" font-size="8.5" font-family="'Geist Mono', monospace" text-anchor="middle">Directory Handoff on Exit</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">Tier 1</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-link);"></div>
+          <h3>Presentation</h3>
+        </div>
+        <p>Pure UI rendering and layout calculations. Maintains responsive multi-column geometry without performing any direct filesystem mutations.</p>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">Tier 2</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-purple);"></div>
+          <h3>Application</h3>
+        </div>
+        <p>Dispatches keyboard and mouse events, coordinates multiple tab sessions, and oversees background worker goroutines and cancellation tokens.</p>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">Tier 3</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-accent);"></div>
+          <h3>Domain Services</h3>
+        </div>
+        <p>Core business logic: reversible file operations, soft deletion to Trash, real-time in-memory filtering, and deep path discovery algorithms.</p>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">Tier 4</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-green);"></div>
+          <h3>Infrastructure</h3>
+        </div>
+        <p>Platform gateways: POSIX file system syscalls, system clipboard integration, seamless terminal handover to external editors, and shell state sync.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>fmtui Conceptual Architecture · Editorial Design</span>
+      <span>Designed with diagram-design grammar</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>

@@ -1,5 +1,8 @@
 # Architecture Diagrams (Mermaid)
 
+> [!TIP]
+> The full suite of updated diagrams categorized into separate documents is located in the [diagrams/](file:///home/kun034/data/coding/Go/tui/poc-fmtui/diagrams) directory. See [diagrams/README.md](file:///home/kun034/data/coding/Go/tui/poc-fmtui/diagrams/README.md) for the complete index.
+
 Below are the system architecture diagrams representing the modular packaging, layout math, and search filtering pipelines currently implemented in **fmtui**.
 
 ---

@@ -7,6 +7,11 @@
 required - go version >= 1.25.4 - nerdfonts (for icons)
 
 ### build from source
+- clone project
+```bash
+git clone https://github.com/chaiyut-kun/PoC-fmtui
+cd PoC-fmtui
+```
 
 ```bash
 go build -o fm
@@ -109,3 +114,7 @@ you can rename file / directory name with press `r` then rename and `enter`
 https://github.com/user-attachments/assets/a19c3b3d-4cfd-4952-af14-c8f93220734b
 
 you can use `ctrl + f` to open quick search inpired **Notion quick search**
+
+# Terminal Emulators supports
+- Gnome Terminal
+- 

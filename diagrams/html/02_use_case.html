@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fmtui · Conceptual Use Case Model</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root[data-theme="light"] {
+      --color-paper: #f8f9fa; --color-paper-2: #f1f3f5; --color-surface: #ffffff;
+      --color-ink: #1e2329; --color-muted: #495057; --color-soft: #868e96;
+      --color-rule: rgba(30,35,41,0.12);
+      --color-accent: #e8590c; --color-accent-tint: rgba(232,89,12,0.08);
+      --color-link: #1c7ed6; --color-link-tint: rgba(28,126,214,0.08);
+      --color-green: #2b8a3e; --color-green-tint: rgba(43,138,62,0.08);
+      --color-purple: #7048e8; --color-purple-tint: rgba(112,72,232,0.08);
+      --color-teal: #0ca678; --color-teal-tint: rgba(12,166,120,0.08);
+      --dot-fill: rgba(30,35,41,0.08);
+    }
+    :root[data-theme="dark"] {
+      --color-paper: #121417; --color-paper-2: #1a1d23; --color-surface: #22262e;
+      --color-ink: #e9ecef; --color-muted: #adb5bd; --color-soft: #6c757d;
+      --color-rule: rgba(233,236,239,0.12);
+      --color-accent: #ff922b; --color-accent-tint: rgba(255,146,43,0.12);
+      --color-link: #4dabf7; --color-link-tint: rgba(77,171,247,0.12);
+      --color-green: #51cf66; --color-green-tint: rgba(81,207,102,0.12);
+      --color-purple: #9775fa; --color-purple-tint: rgba(151,117,250,0.12);
+      --color-teal: #20c997; --color-teal-tint: rgba(32,201,151,0.12);
+      --dot-fill: rgba(233,236,239,0.08);
+    }
+    body { font-family: 'Geist', system-ui, sans-serif; background: var(--color-paper); min-height: 100vh; padding: 2.5rem 2rem; color: var(--color-ink); transition: background 0.2s, color 0.2s; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .top-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+    .nav-links { font-family: 'Geist Mono', monospace; font-size: 0.75rem; display: flex; gap: 1rem; }
+    .nav-links a { color: var(--color-muted); text-decoration: none; border-bottom: 1px solid var(--color-rule); }
+    .nav-links a:hover { color: var(--color-accent); }
+    .theme-toggle { background: var(--color-surface); border: 1px solid var(--color-rule); padding: 0.35rem 0.75rem; border-radius: 4px; color: var(--color-ink); font-family: 'Geist Mono', monospace; font-size: 0.75rem; cursor: pointer; }
+    .header { margin-bottom: 2rem; }
+    .header-eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.7rem; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.5rem; }
+    h1 { font-family: 'Instrument Serif', serif; font-size: clamp(2rem, 3vw + 1rem, 2.75rem); font-weight: 400; letter-spacing: -0.02em; line-height: 1.15; margin-bottom: 0.5rem; }
+    .subtitle { font-size: 1rem; line-height: 1.5; color: var(--color-muted); max-width: 65ch; }
+    .diagram-container { background: var(--color-paper-2); border-radius: 8px; border: 1px solid var(--color-rule); padding: 1.5rem; overflow-x: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.03); }
+    svg { width: 100%; min-width: 960px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1.5rem; }
+    @media (max-width: 900px) { .cards { grid-template-columns: 1fr; } }
+    .card { background: var(--color-surface); border-radius: 6px; border: 1px solid var(--color-rule); padding: 1.25rem; }
+    .card .eyebrow { font-family: 'Geist Mono', monospace; font-size: 0.65rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-soft); margin-bottom: 0.5rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.75rem; border-bottom: 1px solid var(--color-rule); }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card h3 { font-size: 0.95rem; font-weight: 600; }
+    .card p { color: var(--color-muted); font-size: 0.825rem; line-height: 1.5; }
+    .footer { margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid var(--color-rule); font-family: 'Geist Mono', monospace; font-size: 0.75rem; color: var(--color-soft); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-nav">
+      <div class="nav-links">
+        <a href="../README.md">← Diagrams Root</a>
+        <a href="../md/02_use_case.md">View Markdown/Mermaid</a>
+      </div>
+      <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark / Light</button>
+    </div>
+
+    <div class="header">
+      <p class="header-eyebrow">02 · Use Case Model (Conceptual)</p>
+      <h1>Functional Capabilities & User Goals</h1>
+      <p class="subtitle">Focuses purely on developer and user objectives, eliminating keybinding clutter in favor of standard domain boundaries and capability clusters.</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 620" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="grid-dots" width="20" height="20" patternUnits="userSpaceOnUse">
+            <circle cx="1" cy="1" r="1" fill="var(--dot-fill)"/>
+          </pattern>
+          <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--color-muted)"/></marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="var(--color-paper)" rx="6"/>
+        <rect width="100%" height="100%" fill="url(#grid-dots)" opacity="0.8"/>
+
+        <!-- User Actor on the Left -->
+        <g transform="translate(40, 260)">
+          <circle cx="36" cy="24" r="16" fill="var(--color-surface)" stroke="var(--color-ink)" stroke-width="1.8"/>
+          <path d="M 16,68 Q 36,44 56,68" fill="none" stroke="var(--color-ink)" stroke-width="1.8"/>
+          <text x="36" y="86" fill="var(--color-ink)" font-size="12" font-weight="600" text-anchor="middle">Terminal User</text>
+          <text x="36" y="100" fill="var(--color-soft)" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Developer / Admin</text>
+        </g>
+
+        <!-- System Boundary Box -->
+        <rect x="170" y="30" width="790" height="560" rx="10" fill="none" stroke="var(--color-rule)" stroke-width="1.2" stroke-dasharray="6,4"/>
+        <text x="190" y="52" fill="var(--color-soft)" font-size="10" font-family="'Geist Mono', monospace" font-weight="600" letter-spacing="0.14em">FMTUI SYSTEM BOUNDARY</text>
+
+        <!-- Domain 1: Workspace & Navigation -->
+        <g transform="translate(200, 70)">
+          <rect x="0" y="0" width="340" height="90" rx="6" fill="var(--color-link-tint)" stroke="var(--color-link)" stroke-width="1"/>
+          <text x="14" y="20" fill="var(--color-link)" font-size="9" font-family="'Geist Mono', monospace" font-weight="600">1. WORKSPACE & NAVIGATION</text>
+          <rect x="14" y="28" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Explore Directory Tree</text>
+          <rect x="170" y="28" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Multi-Tab Workspaces</text>
+          <rect x="14" y="58" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Multi-Pane Focus</text>
+          <rect x="170" y="58" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Toggle Hidden Files</text>
+        </g>
+
+        <!-- Domain 2: File Manipulation & Safety -->
+        <g transform="translate(200, 180)">
+          <rect x="0" y="0" width="340" height="120" rx="6" fill="var(--color-accent-tint)" stroke="var(--color-accent)" stroke-width="1"/>
+          <text x="14" y="20" fill="var(--color-accent)" font-size="9" font-family="'Geist Mono', monospace" font-weight="600">2. FILE MANIPULATION & SAFETY</text>
+          <rect x="14" y="28" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Create Files & Folders</text>
+          <rect x="170" y="28" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Rename Item</text>
+          <rect x="14" y="58" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Safe Delete to Trash</text>
+          <rect x="170" y="58" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Transfer (Copy / Cut / Paste)</text>
+          <rect x="14" y="88" width="311" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="170" y="104" fill="var(--color-ink)" font-size="10" font-weight="600" text-anchor="middle">Atomic Undo / Redo Past Actions</text>
+        </g>
+
+        <!-- Domain 3: Search & Discovery -->
+        <g transform="translate(200, 320)">
+          <rect x="0" y="0" width="340" height="90" rx="6" fill="var(--color-purple-tint)" stroke="var(--color-purple)" stroke-width="1"/>
+          <text x="14" y="20" fill="var(--color-purple)" font-size="9" font-family="'Geist Mono', monospace" font-weight="600">3. SEARCH & DISCOVERY</text>
+          <rect x="14" y="28" width="311" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="170" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Live In-View Content Filter</text>
+          <rect x="14" y="58" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Ranked Quick Find</text>
+          <rect x="170" y="58" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Quick Access Bookmarks</text>
+        </g>
+
+        <!-- Domain 4: Inspection & Permissions -->
+        <g transform="translate(580, 70)">
+          <rect x="0" y="0" width="340" height="90" rx="6" fill="var(--color-teal-tint)" stroke="var(--color-teal)" stroke-width="1"/>
+          <text x="14" y="20" fill="var(--color-teal)" font-size="9" font-family="'Geist Mono', monospace" font-weight="600">4. INSPECTION & ACCESS CONTROL</text>
+          <rect x="14" y="28" width="311" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="170" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Syntax Highlighted File Preview</text>
+          <rect x="14" y="58" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">File Metadata Inspector</text>
+          <rect x="170" y="58" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Modify Permissions (Chmod)</text>
+        </g>
+
+        <!-- Domain 5: Environment Integration -->
+        <g transform="translate(580, 180)">
+          <rect x="0" y="0" width="340" height="90" rx="6" fill="var(--color-green-tint)" stroke="var(--color-green)" stroke-width="1"/>
+          <text x="14" y="20" fill="var(--color-green)" font-size="9" font-family="'Geist Mono', monospace" font-weight="600">5. ENVIRONMENT INTEGRATION</text>
+          <rect x="14" y="28" width="311" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="170" y="44" fill="var(--color-ink)" font-size="10" text-anchor="middle">Open in External Text Editor ($EDITOR)</text>
+          <rect x="14" y="58" width="145" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="86" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Spawn Context Subshell</text>
+          <rect x="170" y="58" width="155" height="24" rx="3" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="0.8"/>
+          <text x="247" y="74" fill="var(--color-ink)" font-size="10" text-anchor="middle">Preserve Directory on Exit</text>
+        </g>
+
+        <!-- Connecting Lines from User to Domains -->
+        <path d="M 85,290 C 130,290 140,115 195,115" fill="none" stroke="var(--color-muted)" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 85,300 C 130,300 140,240 195,240" fill="none" stroke="var(--color-muted)" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 85,310 C 130,310 140,365 195,365" fill="none" stroke="var(--color-muted)" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 85,300 C 160,300 480,115 575,115" fill="none" stroke="var(--color-muted)" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <path d="M 85,310 C 160,310 480,225 575,225" fill="none" stroke="var(--color-muted)" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <!-- Relationships Box -->
+        <g transform="translate(200, 440)">
+          <rect x="0" y="0" width="720" height="120" rx="6" fill="var(--color-surface)" stroke="var(--color-rule)" stroke-width="1"/>
+          <text x="20" y="24" fill="var(--color-ink)" font-size="11" font-weight="600">Core Relationship Semantics</text>
+          <text x="20" y="48" fill="var(--color-muted)" font-size="9.5" font-family="'Geist Mono', monospace">● File Mutations (Create, Rename, Delete, Chmod) --&gt; &lt;&lt;includes&gt;&gt; Journal Logging (Undo / Redo)</text>
+          <text x="20" y="70" fill="var(--color-muted)" font-size="9.5" font-family="'Geist Mono', monospace">● Transfer Operation (Paste) --&gt; &lt;&lt;extends&gt;&gt; Conflict Resolution Dialog on Destination Collision</text>
+          <text x="20" y="92" fill="var(--color-muted)" font-size="9.5" font-family="'Geist Mono', monospace">● External Process ($EDITOR / Shell) --&gt; &lt;&lt;includes&gt;&gt; Auto-rescan &amp; Resync on Termination</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">Safety Philosophy</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-accent);"></div>
+          <h3>Non-Destructive Operations</h3>
+        </div>
+        <p>All item deletions route through the OS Trash system, and mutating actions are registered into an atomic rollback journal.</p>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">Productivity Focus</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-purple);"></div>
+          <h3>Discovery at Scale</h3>
+        </div>
+        <p>Combines zero-latency in-memory query filtering with depth-bounded filesystem path traversal to pinpoint items in large projects.</p>
+      </div>
+
+      <div class="card">
+        <p class="eyebrow">UNIX Citizen</p>
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--color-green);"></div>
+          <h3>Tooling Handoff</h3>
+        </div>
+        <p>Integrates naturally into the user's terminal workflow by synchronizing directory changes upon exit and deferring to the user's chosen text editor.</p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <span>fmtui Conceptual Use Cases · Editorial Design</span>
+      <span>Designed with diagram-design grammar</span>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      html.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+  </script>
+</body>
+</html>
