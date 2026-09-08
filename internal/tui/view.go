@@ -219,7 +219,7 @@ func (m model) View() tea.View {
 		}
 
 		if t.cursor == i {
-			rowText := fmt.Sprintf("%s%s %s %s", cursorSymbol, selectMarker, icon, displayName)
+			rowText := fmt.Sprintf("%s %s %s %s", cursorSymbol, selectMarker, icon, displayName)
 			sb.WriteString(bg(Black(rowText)) + "\n")
 		} else {
 			sb.WriteString(fmt.Sprintf("%s%s %s\n", cursorSymbol, selectMarker, fg(icon+ItemEndSpace+displayName)))
@@ -235,13 +235,24 @@ func (m model) View() tea.View {
 
 	// Metadata bar pinned at bottom inside the border
 	metaFiles := t.visibleFiles()
+	maxMetaLen := min(sLeftWidth-4, 55)
+	if maxMetaLen < 15 {
+		maxMetaLen = 15
+	}
+
 	if len(m.selected) > 0 {
 		summary := buildSelectionSummary(t.currentDir, metaFiles, m.selected)
+		if len([]rune(summary)) > maxMetaLen {
+			summary = string([]rune(summary)[:maxMetaLen-3]) + "..."
+		}
 		sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), Yellow(summary)))
 	} else if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
 		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
-		sb.WriteString(fmt.Sprintf("%s %s | %s | %s | %s\n",
-			Gray("─"), Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr))
+		metaText := fmt.Sprintf("%s | %s | %s | %s", Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
+		if len([]rune(metaText)) > maxMetaLen {
+			metaText = string([]rune(metaText)[:maxMetaLen-3]) + "..."
+		}
+		sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), metaText))
 	} else {
 		sb.WriteString(Gray(" No file / directory found") + "\n")
 	}

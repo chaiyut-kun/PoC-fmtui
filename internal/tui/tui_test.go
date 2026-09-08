@@ -1961,3 +1961,29 @@ func TestBuildSelectionSummary(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildSelectionSummaryVeryLongName(t *testing.T) {
+	longFileName := "helloworldthisisfortestfile-over-of-lenght-then-limit-length-of-items-name-sowillnotwrapintonewline-loremipsum-loremipsum-lorem-ipsum-lorem-ipsumhelloworldhahapleasethisishahamoremoremore.txt"
+	files := []string{longFileName}
+	tempDir, err := os.MkdirTemp("", "long_name_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+	_ = os.WriteFile(filepath.Join(tempDir, longFileName), []byte("test"), 0644)
+
+	sel := map[int]struct{}{0: {}}
+	result := buildSelectionSummary(tempDir, files, sel)
+
+	// Result should truncate the long filename using ... and preserve .txt extension
+	if !strings.Contains(result, ".txt") {
+		t.Errorf("Expected truncated summary to preserve '.txt' extension, got %q", result)
+	}
+	if !strings.Contains(result, "...") {
+		t.Errorf("Expected truncated summary to contain '...', got %q", result)
+	}
+	if len([]rune(result)) > 55 {
+		t.Errorf("Expected summary for long filename to be <= 55 chars, got len %d (%q)", len([]rune(result)), result)
+	}
+}
+

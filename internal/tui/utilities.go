@@ -493,7 +493,8 @@ func buildSelectionSummary(dir string, files []string, selected map[int]struct{}
 	// Only files
 	if dirCount == 0 {
 		if fileCount == 1 {
-			return fmt.Sprintf(`"%s" selected (%s)`, files[fileIdxs[0]], formatFileSize(totalFileSize))
+			name := truncateFileName(files[fileIdxs[0]], 30)
+			return fmt.Sprintf(`"%s" selected (%s)`, name, formatFileSize(totalFileSize))
 		}
 		return fmt.Sprintf("%d items selected (%s)", fileCount, formatFileSize(totalFileSize))
 	}
@@ -501,7 +502,8 @@ func buildSelectionSummary(dir string, files []string, selected map[int]struct{}
 	// Only dirs
 	if fileCount == 0 {
 		if dirCount == 1 {
-			return fmt.Sprintf(`"%s" selected (%d items)`, files[dirIdxs[0]], totalDirItems)
+			name := truncateFileName(files[dirIdxs[0]], 30)
+			return fmt.Sprintf(`"%s" selected (%d items)`, name, totalDirItems)
 		}
 		return fmt.Sprintf("%d folders selected (total %d items)", dirCount, totalDirItems)
 	}
