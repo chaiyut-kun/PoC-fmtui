@@ -1,0 +1,240 @@
+{
+  "version": "1",
+  "meta": {
+    "name": "Main Screen",
+    "theme": "dracula",
+    "savedAt": "2026-09-08T06:10:58.240Z"
+  },
+  "tree": {
+    "id": "root",
+    "type": "Screen",
+    "name": "Main Screen",
+    "props": {
+      "width": 102,
+      "height": 32,
+      "theme": "dracula"
+    },
+    "layout": {
+      "type": "absolute"
+    },
+    "style": {
+      "border": false
+    },
+    "events": {},
+    "locked": false,
+    "hidden": false,
+    "collapsed": false,
+    "children": [
+      {
+        "id": "pane-shortcuts",
+        "type": "Box",
+        "name": "1 - Shortcuts Pane",
+        "props": {
+          "width": 19,
+          "height": 25
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "yellow"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": []
+      },
+      {
+        "id": "pane-file-explorer",
+        "type": "Box",
+        "name": "2 - File Explorer Pane",
+        "props": {
+          "width": 37,
+          "height": 21
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 20,
+          "y": 0
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "blue"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": []
+      },
+      {
+        "id": "pane-process",
+        "type": "Box",
+        "name": "Process Box",
+        "props": {
+          "width": 18,
+          "height": 3
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 20,
+          "y": 22
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "blue"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "process-header",
+            "type": "Text",
+            "name": "Process Header",
+            "props": {
+              "content": "──── Process ────",
+              "align": "center",
+              "wrap": false,
+              "width": 16
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "blue",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "pane-clipboard",
+        "type": "Box",
+        "name": "Clipboard Box",
+        "props": {
+          "width": 18,
+          "height": 3
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 39,
+          "y": 22
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "blue"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "clipboard-header",
+            "type": "Text",
+            "name": "Clipboard Header",
+            "props": {
+              "content": "─── Clipboard ───",
+              "align": "center",
+              "wrap": false,
+              "width": 16
+            },
+            "layout": {
+              "type": "none",
+              "x": 0,
+              "y": 0
+            },
+            "style": {
+              "color": "blue",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "comp-1788847687645-1",
+        "type": "Box",
+        "name": "1 - Shortcuts Pane",
+        "props": {
+          "width": 21,
+          "height": 25
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "yellow"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 58,
+          "y": 0
+        },
+        "children": []
+      },
+      {
+        "type": "Spacer",
+        "name": "Spacer",
+        "props": {
+          "width": 1,
+          "height": 1
+        },
+        "layout": {
+          "type": "none",
+          "x": 10,
+          "y": 10
+        },
+        "style": {},
+        "events": {},
+        "children": [],
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "id": "comp-1788847790537-2"
+      }
+    ]
+  }
+}

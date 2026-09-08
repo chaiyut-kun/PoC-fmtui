@@ -1,0 +1,505 @@
+{
+  "version": "1",
+  "meta": {
+    "name": "File Explorer Main Screen",
+    "theme": "dracula",
+    "savedAt": "2026-09-09T00:00:00.000Z"
+  },
+  "tree": {
+    "id": "root",
+    "type": "Screen",
+    "name": "File Explorer Main Screen",
+    "props": {
+      "width": 120,
+      "height": 32,
+      "theme": "dracula"
+    },
+    "layout": {
+      "type": "absolute"
+    },
+    "style": {
+      "border": false
+    },
+    "events": {},
+    "locked": false,
+    "hidden": false,
+    "collapsed": false,
+    "children": [
+      {
+        "id": "shortcuts-pane",
+        "type": "Box",
+        "name": "1 - Shortcuts",
+        "props": {
+          "width": 22,
+          "height": 32
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 0,
+          "y": 0
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "yellow"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "shortcuts-title",
+            "type": "Text",
+            "name": "Shortcuts Title",
+            "props": {
+              "content": "── Shortcuts ──",
+              "align": "center",
+              "wrap": false,
+              "width": 20
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "yellow",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "shortcuts-items",
+            "type": "Text",
+            "name": "Shortcut Items",
+            "props": {
+              "content": "🏠 Home\n🖥 Desktop\n📁 Documents\n⇩ Downloads\n▦ Music\n▧ Pictures\n▷ Videos\n\n──────────────────\nalgo\nchokchai\nkku\ngo-workspace\ndata-mining\ndata\nmain\npoc-fmtui\nopencode\n▶ project1",
+              "align": "left",
+              "wrap": false,
+              "width": 20
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "white",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      },
+
+      {
+        "id": "file-explorer-pane",
+        "type": "Box",
+        "name": "2 - File Explorer",
+        "props": {
+          "width": 59,
+          "height": 27
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 23,
+          "y": 0
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "blue"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "explorer-header",
+            "type": "Text",
+            "name": "Explorer Header",
+            "props": {
+              "content": "2                                      [exam]",
+              "align": "left",
+              "wrap": false,
+              "width": 57
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "blue",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "breadcrumb",
+            "type": "Text",
+            "name": "Breadcrumb",
+            "props": {
+              "content": "user: ~/data/cs/4/project1/exam",
+              "align": "left",
+              "wrap": false,
+              "width": 57
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "cyan",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "search-box",
+            "type": "Box",
+            "name": "Search",
+            "props": {
+              "width": 55,
+              "height": 4
+            },
+            "layout": {
+              "type": "flexbox",
+              "direction": "column",
+              "padding": 1,
+              "gap": 0
+            },
+            "style": {
+              "color": "white",
+              "border": true,
+              "borderStyle": "rounded",
+              "borderColor": "gray"
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": [
+              {
+                "id": "search-placeholder",
+                "type": "Text",
+                "name": "Search Placeholder",
+                "props": {
+                  "content": "⌕ press s to search",
+                  "align": "left",
+                  "wrap": false,
+                  "width": 53
+                },
+                "layout": {
+                  "type": "none"
+                },
+                "style": {
+                  "color": "gray",
+                  "bold": true
+                },
+                "events": {},
+                "locked": false,
+                "hidden": false,
+                "collapsed": false,
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "file-tree",
+            "type": "Text",
+            "name": "File Tree",
+            "props": {
+              "content": "▶  📁 cs1\n     📁 cs5",
+              "align": "left",
+              "wrap": false,
+              "width": 57
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "white",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "explorer-status",
+            "type": "Text",
+            "name": "Explorer Status",
+            "props": {
+              "content": "─ 17 items | drwxr-xr-x (755) | user | 2026-07-17 13:19:17",
+              "align": "left",
+              "wrap": false,
+              "width": 57
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "yellow",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      },
+
+      {
+        "id": "preview-pane",
+        "type": "Box",
+        "name": "3 - Preview",
+        "props": {
+          "width": 38,
+          "height": 32
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 82,
+          "y": 0
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "gray"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "preview-header",
+            "type": "Text",
+            "name": "Preview Header",
+            "props": {
+              "content": "── Preview ──",
+              "align": "center",
+              "wrap": false,
+              "width": 36
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "gray",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "preview-files",
+            "type": "Text",
+            "name": "Preview Files",
+            "props": {
+              "content": "📄 Makefile\n📄 README.md\n📁 __pycache__\n📄 agv.sh\n📄 app.py\n📄 data-prepare-flow.md\n📁 datasets\n📄 detector.py\n📁 images\n📁 models\n📄 requirements.txt\n📄 systemflow.md\n📁 vdo",
+              "align": "left",
+              "wrap": false,
+              "width": 36
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "white",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      },
+
+      {
+        "id": "process-pane",
+        "type": "Box",
+        "name": "Process",
+        "props": {
+          "width": 29,
+          "height": 5
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 23,
+          "y": 27
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "blue"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "process-header",
+            "type": "Text",
+            "name": "Process Header",
+            "props": {
+              "content": "──── Process ────",
+              "align": "center",
+              "wrap": false,
+              "width": 27
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "blue",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "process-status",
+            "type": "Text",
+            "name": "Process Status",
+            "props": {
+              "content": "Idle",
+              "align": "left",
+              "wrap": false,
+              "width": 27
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "white",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      },
+
+      {
+        "id": "clipboard-pane",
+        "type": "Box",
+        "name": "Clipboard",
+        "props": {
+          "width": 30,
+          "height": 5
+        },
+        "layout": {
+          "type": "flexbox",
+          "direction": "column",
+          "padding": 1,
+          "gap": 0,
+          "x": 52,
+          "y": 27
+        },
+        "style": {
+          "color": "white",
+          "border": true,
+          "borderStyle": "rounded",
+          "borderColor": "blue"
+        },
+        "events": {},
+        "locked": false,
+        "hidden": false,
+        "collapsed": false,
+        "children": [
+          {
+            "id": "clipboard-header",
+            "type": "Text",
+            "name": "Clipboard Header",
+            "props": {
+              "content": "─── Clipboard ───",
+              "align": "center",
+              "wrap": false,
+              "width": 28
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "blue",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          },
+          {
+            "id": "clipboard-status",
+            "type": "Text",
+            "name": "Clipboard Status",
+            "props": {
+              "content": "Empty",
+              "align": "left",
+              "wrap": false,
+              "width": 28
+            },
+            "layout": {
+              "type": "none"
+            },
+            "style": {
+              "color": "white",
+              "bold": true
+            },
+            "events": {},
+            "locked": false,
+            "hidden": false,
+            "collapsed": false,
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

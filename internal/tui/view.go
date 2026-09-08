@@ -209,7 +209,7 @@ func (m model) View() tea.View {
 		if t.cursor == i {
 			cursorSymbol = CursorIcon
 		}
-		selectMarker := " "
+		selectMarker := ""
 		if _, ok := m.selected[i]; ok {
 			if t.cursor == i {
 				selectMarker = Marker
@@ -219,10 +219,10 @@ func (m model) View() tea.View {
 		}
 
 		if t.cursor == i {
-			rowText := fmt.Sprintf("%s %s %s %s", cursorSymbol, selectMarker, icon, displayName)
+			rowText := fmt.Sprintf("%s%s %s %s", cursorSymbol, selectMarker, icon, displayName)
 			sb.WriteString(bg(Black(rowText)) + "\n")
 		} else {
-			sb.WriteString(fmt.Sprintf("%s %s %s\n", cursorSymbol, selectMarker, fg(icon+ItemEndSpace+displayName)))
+			sb.WriteString(fmt.Sprintf("%s%s %s\n", cursorSymbol, selectMarker, fg(icon+ItemEndSpace+displayName)))
 		}
 	}
 
