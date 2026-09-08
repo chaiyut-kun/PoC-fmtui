@@ -1880,3 +1880,84 @@ func TestToggleShortcutPreservesActivePane(t *testing.T) {
 	}
 }
 
+func TestBuildSelectionSummary(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "sel_summary_test")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Create files
+	_ = os.WriteFile(filepath.Join(tempDir, "main.go"), []byte("package main"), 0644)
+	_ = os.WriteFile(filepath.Join(tempDir, "util.go"), []byte("package util pkg"), 0644)
+	_ = os.WriteFile(filepath.Join(tempDir, "readme.md"), []byte("# README"), 0644)
+
+	// Create dirs with items inside
+	_ = os.MkdirAll(filepath.Join(tempDir, "src"), 0755)
+	_ = os.WriteFile(filepath.Join(tempDir, "src", "a.go"), []byte("a"), 0644)
+	_ = os.WriteFile(filepath.Join(tempDir, "src", "b.go"), []byte("b"), 0644)
+
+	_ = os.MkdirAll(filepath.Join(tempDir, "pkg"), 0755)
+	_ = os.WriteFile(filepath.Join(tempDir, "pkg", "c.go"), []byte("c"), 0644)
+
+	_ = os.MkdirAll(filepath.Join(tempDir, "cmd"), 0755)
+
+	files := []string{"main.go", "util.go", "readme.md", "src", "pkg", "cmd"}
+
+	// Case 1: 1 file selected
+	sel := map[int]struct{}{0: {}}
+	result := buildSelectionSummary(tempDir, files, sel)
+	if !strings.Contains(result, `"main.go" selected`) {
+		t.Errorf("Case 1: expected single file name, got %q", result)
+	}
+
+	// Case 2: 3 files selected
+	sel = map[int]struct{}{0: {}, 1: {}, 2: {}}
+	result = buildSelectionSummary(tempDir, files, sel)
+	if !strings.Contains(result, "3 items selected") {
+		t.Errorf("Case 2: expected '3 items selected', got %q", result)
+	}
+
+	// Case 3: 1 dir selected
+	sel = map[int]struct{}{3: {}}
+	result = buildSelectionSummary(tempDir, files, sel)
+	if !strings.Contains(result, `"src" selected`) || !strings.Contains(result, "2 items") {
+		t.Errorf("Case 3: expected single dir with items, got %q", result)
+	}
+
+	// Case 4: 3 dirs selected
+	sel = map[int]struct{}{3: {}, 4: {}, 5: {}}
+	result = buildSelectionSummary(tempDir, files, sel)
+	if !strings.Contains(result, "3 folders selected") || !strings.Contains(result, "total") {
+		t.Errorf("Case 4: expected '3 folders selected (total N items)', got %q", result)
+	}
+
+	// Case 5: 1 dir + 1 file (mixed)
+	sel = map[int]struct{}{3: {}, 0: {}}
+	result = buildSelectionSummary(tempDir, files, sel)
+	if !strings.Contains(result, "[selected]") || !strings.Contains(result, "1 folder") || !strings.Contains(result, "1 item") {
+		t.Errorf("Case 5: expected mixed format, got %q", result)
+	}
+
+	// Case 6: 3 dirs + 3 files (mixed)
+	sel = map[int]struct{}{3: {}, 4: {}, 5: {}, 0: {}, 1: {}, 2: {}}
+	result = buildSelectionSummary(tempDir, files, sel)
+	if !strings.Contains(result, "[selected]") || !strings.Contains(result, "3 folders") || !strings.Contains(result, "3 items") {
+		t.Errorf("Case 6: expected mixed format, got %q", result)
+	}
+
+	// All results should be <= 60 chars (excluding ANSI codes)
+	for i, tc := range []map[int]struct{}{
+		{0: {}},
+		{0: {}, 1: {}, 2: {}},
+		{3: {}},
+		{3: {}, 4: {}, 5: {}},
+		{3: {}, 0: {}},
+		{3: {}, 4: {}, 5: {}, 0: {}, 1: {}, 2: {}},
+	} {
+		r := buildSelectionSummary(tempDir, files, tc)
+		if len(r) > 60 {
+			t.Errorf("Case %d: result exceeds 60 chars (%d): %q", i+1, len(r), r)
+		}
+	}
+}

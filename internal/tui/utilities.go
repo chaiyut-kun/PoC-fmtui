@@ -381,17 +381,18 @@ func getPreviewLines(path string, isFolder bool, showHidden bool) []string {
 }
 
 type FileMetaInfo struct {
-	Name        string
-	AbsPath     string
-	SizeStr     string
-	SizeBytes   int64
-	PermStr     string
-	OwnerGroup  string
-	ModTimeStr  string
-	MimeOrType  string
-	IsDirectory bool
-	IsSymlink   bool
-	SymTarget   string
+	Name         string
+	AbsPath      string
+	SizeStr      string
+	SizeBytes    int64
+	PermStr      string
+	PermStrShort string
+	OwnerGroup   string
+	ModTimeStr   string
+	MimeOrType   string
+	IsDirectory  bool
+	IsSymlink    bool
+	SymTarget    string
 }
 
 func getFileMetadataInfo(dir string, name string) FileMetaInfo {
@@ -424,7 +425,8 @@ func getFileMetadataInfo(dir string, name string) FileMetaInfo {
 	meta.IsDirectory = info.IsDir()
 	meta.SizeBytes = info.Size()
 	meta.PermStr = fmt.Sprintf("%s (%o)", info.Mode().String(), info.Mode().Perm())
-	meta.ModTimeStr = info.ModTime().Format("2006-01-02 15:04:02")
+	meta.PermStrShort = info.Mode().String()
+	meta.ModTimeStr = info.ModTime().Format("2006-01-02 3:04 PM")
 
 	if info.IsDir() {
 		entries, err := os.ReadDir(absP)
@@ -457,6 +459,69 @@ func formatFileSize(size int64) string {
 		return fmt.Sprintf("%.1f MB", float64(size)/(1024.0*1024.0))
 	}
 	return fmt.Sprintf("%.1f GB", float64(size)/(1024.0*1024.0*1024.0))
+}
+
+// buildSelectionSummary returns a formatted string describing the selected items.
+func buildSelectionSummary(dir string, files []string, selected map[int]struct{}) string {
+	var dirIdxs, fileIdxs []int
+	for idx := range selected {
+		if idx >= 0 && idx < len(files) {
+			if isDir(dir, files[idx]) {
+				dirIdxs = append(dirIdxs, idx)
+			} else {
+				fileIdxs = append(fileIdxs, idx)
+			}
+		}
+	}
+
+	// Count dir contents and file sizes in one pass
+	totalDirItems := 0
+	for _, idx := range dirIdxs {
+		if entries, err := os.ReadDir(filepath.Join(dir, files[idx])); err == nil {
+			totalDirItems += len(entries)
+		}
+	}
+	var totalFileSize int64
+	for _, idx := range fileIdxs {
+		if info, err := os.Stat(filepath.Join(dir, files[idx])); err == nil {
+			totalFileSize += info.Size()
+		}
+	}
+
+	dirCount, fileCount := len(dirIdxs), len(fileIdxs)
+
+	// Only files
+	if dirCount == 0 {
+		if fileCount == 1 {
+			return fmt.Sprintf(`"%s" selected (%s)`, files[fileIdxs[0]], formatFileSize(totalFileSize))
+		}
+		return fmt.Sprintf("%d items selected (%s)", fileCount, formatFileSize(totalFileSize))
+	}
+
+	// Only dirs
+	if fileCount == 0 {
+		if dirCount == 1 {
+			return fmt.Sprintf(`"%s" selected (%d items)`, files[dirIdxs[0]], totalDirItems)
+		}
+		return fmt.Sprintf("%d folders selected (total %d items)", dirCount, totalDirItems)
+	}
+
+	// Mixed: dirs + files
+	dirLabel := "1 folder"
+	if dirCount > 1 {
+		dirLabel = fmt.Sprintf("%d folders", dirCount)
+	}
+	fileLabel := "1 item"
+	if fileCount > 1 {
+		fileLabel = fmt.Sprintf("%d items", fileCount)
+	}
+
+	dirDetail := fmt.Sprintf("%d items", totalDirItems)
+	if dirCount > 1 {
+		dirDetail = fmt.Sprintf("total %d items", totalDirItems)
+	}
+
+	return fmt.Sprintf("[selected] %s (%s) | %s (%s)", dirLabel, dirDetail, fileLabel, formatFileSize(totalFileSize))
 }
 
 func getOwnerGroupStr() string {

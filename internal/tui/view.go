@@ -235,10 +235,13 @@ func (m model) View() tea.View {
 
 	// Metadata bar pinned at bottom inside the border
 	metaFiles := t.visibleFiles()
-	if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
+	if len(m.selected) > 0 {
+		summary := buildSelectionSummary(t.currentDir, metaFiles, m.selected)
+		sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), Yellow(summary)))
+	} else if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
 		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
 		sb.WriteString(fmt.Sprintf("%s %s | %s | %s | %s\n",
-			Gray("─"), Yellow(meta.SizeStr), meta.PermStr, meta.OwnerGroup, meta.ModTimeStr))
+			Gray("─"), Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr))
 	} else {
 		sb.WriteString(Gray(" No file / directory found") + "\n")
 	}
