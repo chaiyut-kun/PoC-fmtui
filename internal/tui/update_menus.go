@@ -112,7 +112,7 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					break
 				}
 				m.copyMenuOpen = true
-			case "file_permission":
+			case "file_permission", "fileperm":
 				if len(t.visibleFiles()) == 0 {
 					break
 				}
@@ -142,7 +142,7 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				}
 				m.tabs = append(m.tabs, newTab)
 				m.activeTab = len(m.tabs) - 1
-			case "toggle_shortcut":
+			case "toggle_shortcut", "shortcut_toggle":
 				m.shortcutPaneOpen = !m.shortcutPaneOpen
 				if !m.shortcutPaneOpen && m.activePane == 0 {
 					m.activePane = 1
@@ -160,10 +160,14 @@ func (m model) handleMenuKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 					m.isCreatingDir = false
 					return m, m.fileInput.Focus()
 				}
-			case "hidden_file":
+			case "hidden_file", "hidden_toggle":
 				m.showHidden = !m.showHidden
 				m.reloadCurrentDir()
 				m.adjustScroll()
+			case "whoami":
+				m.statusMsg = getCurrentUser()
+			case "pwd":
+				m.statusMsg = t.currentDir
 			}
 			return m, nil
 

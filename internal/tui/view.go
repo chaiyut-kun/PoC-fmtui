@@ -235,10 +235,7 @@ func (m model) View() tea.View {
 
 	// Metadata bar pinned at bottom inside the border
 	metaFiles := t.visibleFiles()
-	maxMetaLen := min(sLeftWidth-4, 55)
-	if maxMetaLen < 15 {
-		maxMetaLen = 15
-	}
+	maxMetaLen := max(min(sLeftWidth, 60), 15)
 
 	if len(m.selected) > 0 {
 		summary := buildSelectionSummary(t.currentDir, metaFiles, m.selected)
@@ -248,11 +245,14 @@ func (m model) View() tea.View {
 		sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), Yellow(summary)))
 	} else if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
 		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
-		metaText := fmt.Sprintf("%s | %s | %s | %s", Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
-		if len([]rune(metaText)) > maxMetaLen {
-			metaText = string([]rune(metaText)[:maxMetaLen-3]) + "..."
+		rawMetaText := fmt.Sprintf("%s | %s | %s | %s", meta.SizeStr, meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
+		if len([]rune(rawMetaText)) > maxMetaLen {
+			truncated := string([]rune(rawMetaText)[:maxMetaLen-3]) + "..."
+			sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), truncated))
+		} else {
+			sb.WriteString(fmt.Sprintf("%s %s | %s | %s | %s\n",
+				Gray("─"), Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr))
 		}
-		sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), metaText))
 	} else {
 		sb.WriteString(Gray(" No file / directory found") + "\n")
 	}
@@ -334,17 +334,11 @@ func (m model) View() tea.View {
 
 		// --- Bookmarks section ---
 		// available lines for bookmarks = total height - shortcuts - 1 divider - 2 border
-		availBmLines := boxHeight - len(m.shortcuts) - 1 - paneBorderPadding
-		if availBmLines < 0 {
-			availBmLines = 0
-		}
+		availBmLines := max(boxHeight-len(m.shortcuts)-1-paneBorderPadding, 0)
 
 		// Clamp scroll
 		maxBmScroll := max(len(m.bookmarks)-availBmLines, 0)
-		bmScroll := m.bookmarkScrollOffset
-		if bmScroll > maxBmScroll {
-			bmScroll = maxBmScroll
-		}
+		bmScroll := min(m.bookmarkScrollOffset, maxBmScroll)
 
 		visibleBm := m.bookmarks
 		if bmScroll < len(m.bookmarks) {
@@ -364,7 +358,7 @@ func (m model) View() tea.View {
 				idx := i + bmScroll
 				label := fmt.Sprintf("  %s", bm.Name)
 				if m.shortcutSection == 1 && idx == m.shortcutCursor {
-					label = BgCyan(Black(fmt.Sprintf("%s%s", CursorIcon+" ", bm.Name)))
+					label = BgCyan(Black(fmt.Sprintf("%s%s", CursorIcon+ItemEndSpace, bm.Name)))
 				}
 				lines = append(lines, label)
 			}
@@ -415,7 +409,7 @@ func (m model) View() tea.View {
 				tabParts = append(tabParts, dirName)
 			}
 		}
-		rawTitle := " " + strings.Join(tabParts, " | ") + " "
+		rawTitle := ItemEndSpace + strings.Join(tabParts, " | ") + ItemEndSpace
 		title := []rune(rawTitle)
 		maxTitleLen := leftWidth - tabBorderOffset
 		if maxTitleLen > searchBoxPadding && len(title) > maxTitleLen {
@@ -440,39 +434,33 @@ func (m model) View() tea.View {
 		if barW > 0 {
 			filledLen := min(int(m.copyJobProgress*float64(barW)), barW)
 			emptyLen := barW - filledLen
-			barStr = fmt.Sprintf(" [%s%s] %s", strings.Repeat("█", filledLen), strings.Repeat("░", emptyLen), percentStr)
+			barStr = fmt.Sprintf("[%s%s] %s", strings.Repeat("█", filledLen), strings.Repeat("░", emptyLen), percentStr)
 		} else {
 			barStr = fmt.Sprintf(" %s", percentStr)
 		}
 
-		fileName := m.copyJobFileName
-		if len(fileName) > innerW-2 {
-			fileName = fileName[:max(0, innerW-5)] + "..."
-		}
-		processContent = fmt.Sprintf("Copying...\n%s\n  %s", barStr, fileName)
-	} else {
-		processContent = "\n  Idle"
+		// fileName := m.copyJobFileName
+		// if len(fileName) > innerW-2 {
+		// 	fileName = fileName[:max(0, innerW-5)] + "..."
+		// }
+		processContent = fmt.Sprintf("\n%s\n", barStr)
 	}
 
 	var clipboardContent string
-	if len(m.stagedPaths) == 0 {
-		clipboardContent = "\n  Empty"
-	} else {
-		innerW := max(clipboardWidth-2, 1)
-		var itemLines []string
-		for i, path := range m.stagedPaths {
-			if i >= 2 {
-				itemLines = append(itemLines, fmt.Sprintf("  ... and %d more", len(m.stagedPaths)-2))
-				break
-			}
-			baseName := filepath.Base(path)
-			if len(baseName) > innerW-4 {
-				baseName = baseName[:max(0, innerW-7)] + "..."
-			}
-			itemLines = append(itemLines, "  - "+baseName)
+	innerW := max(clipboardWidth-2, 1)
+	var itemLines []string
+	for i, path := range m.stagedPaths {
+		if i >= 2 {
+			itemLines = append(itemLines, fmt.Sprintf("  ... and %d more", len(m.stagedPaths)-2))
+			break
 		}
-		clipboardContent = strings.Join(itemLines, "\n")
+		baseName := filepath.Base(path)
+		if len(baseName) > innerW-4 {
+			baseName = baseName[:max(0, innerW-7)] + "..."
+		}
+		itemLines = append(itemLines, "  - "+baseName)
 	}
+	clipboardContent = strings.Join(itemLines, "\n")
 
 	processStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
@@ -588,6 +576,7 @@ func (m model) View() tea.View {
 			BorderForeground(lipgloss.Color(colorGreen)). // Green border
 			Padding(1, 2)
 
+		// need to split as function
 		dialogContent := "         Copy Menu\n\n" +
 			"[p] Copy absolute path\n" +
 			"[n] Copy name only\n" +
@@ -607,6 +596,7 @@ func (m model) View() tea.View {
 			BorderForeground(lipgloss.Color(colorPurple)). // Purple border
 			Padding(1, 2)
 
+		// need to split as function
 		dialogContent := "    Bookmark Options\n\n" +
 			"[s] Bookmark Selected Dir\n" +
 			"[c] Bookmark Current CWD\n\n" +
@@ -627,6 +617,7 @@ func (m model) View() tea.View {
 		if m.shortcutCursor >= 0 && m.shortcutCursor < len(m.bookmarks) {
 			bookmarkName = m.bookmarks[m.shortcutCursor].Name
 		}
+		// need to split as function
 		dialogContent := fmt.Sprintf("   Remove Bookmark?\n\nRemove bookmark for %q?\n\n   [y] Yes      [n] No", bookmarkName)
 		dialog := dialogStyle.Render(dialogContent)
 		content = overlayDialog(content, dialog, width, height, DefaultYDivisor)
@@ -638,7 +629,7 @@ func (m model) View() tea.View {
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorRed)). // Red border
 			Padding(1, 2)
-
+		// need to split as function
 		dialogContent := "Delete Menu\n\n" +
 			"[p] Permanent delete\n" +
 			"[n] Normal delete (Trash)\n\n" +
@@ -655,6 +646,7 @@ func (m model) View() tea.View {
 			BorderForeground(lipgloss.Color(colorCyan)). // Cyan border
 			Padding(1, 2)
 
+		// need to split as function
 		dialogContent := "  Permission Menu\n\n" +
 			"[x] Toggle executable (chmod +x/-x)\n\n" +
 			"Press ESC to cancel"
@@ -670,6 +662,7 @@ func (m model) View() tea.View {
 			BorderForeground(lipgloss.Color(colorPurple)). // Purple border
 			Padding(1, 2)
 
+		// need to split as function
 		dialogContent := "       Open Menu\n\n" +
 			"[c] Open CWD with VSCode (code .)\n" +
 			"[C] Open selected with VSCode\n" +
@@ -693,12 +686,12 @@ func (m model) View() tea.View {
 			dialogContent += "\n" + suggestionLine
 		}
 
-		dialogWidth := 60
+		dialogWidth := 50
 		dialogStyle := lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color(colorGreen)).
 			Padding(0, 1).
-			Width(dialogWidth - 4)
+			Width(dialogWidth)
 
 		dialog := dialogStyle.Render(dialogContent)
 
@@ -748,7 +741,7 @@ func (m model) View() tea.View {
 		if len(dialogLines) > 0 {
 			dialogWidth := lipgloss.Width(dialog)
 			barWidth := dialogWidth - 2
-			titleStr := " " + titleText + " "
+			titleStr := ItemEndSpace + titleText + ItemEndSpace
 			runes := []rune(titleStr)
 			if len(runes) > barWidth {
 				titleStr = string(runes[:barWidth])
@@ -781,6 +774,7 @@ func (m model) View() tea.View {
 			symlinkLine = fmt.Sprintf("Symlink Target: %s\n", meta.SymTarget)
 		}
 
+		// need to split as function
 		dialogContent := fmt.Sprintf("File Metadata Inspector\n\n"+
 			"Name:        %s\n"+
 			"Size:        %s\n"+
@@ -810,17 +804,17 @@ func (m model) View() tea.View {
 		var inputLine string
 
 		if m.quickFindSelecting {
-			inputLine = fmt.Sprintf("  %s   %s", SearchIcon, Gray(m.quickFindInput.Value()))
+			inputLine = fmt.Sprintf(" %s %s", SearchIcon, Gray(m.quickFindInput.Value()))
 		} else {
-			inputLine = fmt.Sprintf("  %s  %s", SearchIcon, m.quickFindInput.View())
+			inputLine = fmt.Sprintf(" %s %s", SearchIcon, m.quickFindInput.View())
 		}
 
 		// Build results list
 		var resultLines []string
 		if len(m.quickFindResults) == 0 && m.quickFindInput.Value() == "" {
-			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("Bookmarks are shown here…")))
+			resultLines = append(resultLines, fmt.Sprintf(" %s", Gray("Bookmarks are shown here…")))
 		} else if len(m.quickFindResults) == 0 {
-			resultLines = append(resultLines, fmt.Sprintf("  %s", Gray("No results")))
+			resultLines = append(resultLines, fmt.Sprintf(" %s", Gray("No results")))
 		} else {
 			// Clamp scroll offset
 			maxScroll := max(len(m.quickFindResults)-maxResults, 0)
@@ -886,6 +880,7 @@ func (m model) View() tea.View {
 	return v
 }
 
+// need to move to utilities
 // shrinkPath replaces user home path with ~/ and truncates in the middle if it exceeds maxLen.
 func shrinkPath(path string, maxLen int) string {
 	home, err := os.UserHomeDir()

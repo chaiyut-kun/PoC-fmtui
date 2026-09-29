@@ -10,21 +10,23 @@ type cmdEntry struct {
 }
 
 var cmdRegistry = []cmdEntry{
-	{name: "bookmark", desc: "Open bookmark menu"},
-	{name: "new_item", desc: "Open create new item input"},
+	{name: "bookmark", desc: "Bookmark menu"},
+	{name: "new_item", desc: "Create new item input"},
 	{name: "symlink", desc: "Create symlink for selected item"},
 	{name: "jump_symlink", desc: "Jump to symlink target"},
-	{name: "copy", desc: "Open copy menu"},
-	{name: "file_permission", desc: "Open file permission menu"},
-	{name: "open", desc: "Open with menu"},
+	{name: "copy", desc: "Copy menu"},
+	{name: "fileperm", desc: "File permission menu"},
+	{name: "open", desc: "'Open with...' menu"},
 	{name: "quit", desc: "Quit without change directory"},
 	{name: "exit", desc: "Quit with change directory"},
-	{name: "delete", desc: "Open delete menu"},
+	{name: "delete", desc: "Delete menu"},
 	{name: "newtab", desc: "Create new file explorer tab"},
-	{name: "toggle_shortcut", desc: "Toggle open/close shortcut pane"},
-	{name: "metadata", desc: "Open file metadata inspector"},
-	{name: "rename", desc: "Open rename input"},
-	{name: "hidden_file", desc: "Toggle show/off hidden file"},
+	{name: "shortcut_toggle", desc: "Toggle on/off shortcut panel"},
+	{name: "metadata", desc: "File metadata inspector"},
+	{name: "rename", desc: "Rename input"},
+	{name: "hidden_toggle", desc: "Toggle on/off hidden file"},
+	{name: "whoami", desc: "whoami"},
+	{name: "pwd", desc: "pwd"},
 }
 
 // findCmdSuggestion returns the first command matching the prefix, or empty.
