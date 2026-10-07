@@ -1987,3 +1987,26 @@ func TestBuildSelectionSummaryVeryLongName(t *testing.T) {
 	}
 }
 
+func TestCopyJSFileContentWithWayland(t *testing.T) {
+	jsContent := `(function () {
+  "use strict";
+  window.addEventListener("load", function () {
+    // ขั้นตอนที่ 1: คลิกปุ่ม Settings ก่อน
+    console.log("Settings tab clicked!");
+  });
+})();`
+
+	err := copyToClipboard(jsContent)
+	if err != nil {
+		t.Fatalf("copyToClipboard failed: %v", err)
+	}
+
+	readBack, err := clipboard.ReadAll()
+	if err != nil {
+		t.Fatalf("clipboard.ReadAll failed: %v", err)
+	}
+
+	if readBack != jsContent {
+		t.Errorf("Expected clipboard content to match, got %q", readBack)
+	}
+}

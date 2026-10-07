@@ -50,6 +50,24 @@ func revealInFileExplorer(targetPath string) error {
 
 // copy to clipboard
 func copyToClipboard(text string) error {
+	if os.Getenv("WAYLAND_DISPLAY") != "" {
+		if _, err := exec.LookPath("wl-copy"); err == nil {
+			cmd := exec.Command("wl-copy", "--type", "text/plain")
+			in, err := cmd.StdinPipe()
+			if err == nil {
+				if err := cmd.Start(); err == nil {
+					if _, err := in.Write([]byte(text)); err == nil {
+						_ = in.Close()
+						if err := cmd.Wait(); err == nil {
+							return nil
+						}
+					} else {
+						_ = in.Close()
+					}
+				}
+			}
+		}
+	}
 	return clipboard.WriteAll(text)
 }
 
