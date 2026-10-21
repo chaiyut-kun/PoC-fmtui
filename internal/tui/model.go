@@ -281,6 +281,7 @@ func InitialModel() model {
 	entries, err := os.ReadDir(currentDir)
 	files := []string{}
 	if err == nil {
+		sortDirEntries(currentDir, entries)
 		for _, entry := range entries {
 			if strings.HasPrefix(entry.Name(), ".") {
 				continue

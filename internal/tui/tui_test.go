@@ -2010,3 +2010,152 @@ func TestCopyJSFileContentWithWayland(t *testing.T) {
 		t.Errorf("Expected clipboard content to match, got %q", readBack)
 	}
 }
+
+func TestSortDirEntries_FoldersBeforeFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Create test files and folders
+	_ = os.WriteFile(filepath.Join(tmpDir, "file_b.txt"), []byte("b"), 0644)
+	_ = os.Mkdir(filepath.Join(tmpDir, "folder_b"), 0755)
+	_ = os.WriteFile(filepath.Join(tmpDir, "file_A.txt"), []byte("A"), 0644)
+	_ = os.Mkdir(filepath.Join(tmpDir, "folder_A"), 0755)
+	_ = os.WriteFile(filepath.Join(tmpDir, ".hidden_file"), []byte("hf"), 0644)
+	_ = os.Mkdir(filepath.Join(tmpDir, ".hidden_dir"), 0755)
+	_ = os.Mkdir(filepath.Join(tmpDir, "folder_c"), 0755)
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("os.ReadDir failed: %v", err)
+	}
+
+	sortDirEntries(tmpDir, entries)
+
+	expected := []string{
+		".hidden_dir",
+		"folder_A",
+		"folder_b",
+		"folder_c",
+		".hidden_file",
+		"file_A.txt",
+		"file_b.txt",
+	}
+
+	var actual []string
+	for _, e := range entries {
+		actual = append(actual, e.Name())
+	}
+
+	if len(actual) != len(expected) {
+		t.Fatalf("Expected %d entries, got %d: %v", len(expected), len(actual), actual)
+	}
+
+	for i := range expected {
+		if actual[i] != expected[i] {
+			t.Errorf("Index %d: expected %q, got %q (full list: %v)", i, expected[i], actual[i], actual)
+		}
+	}
+}
+
+func TestSortDirEntries_SymlinkToDir(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	realDir := filepath.Join(tmpDir, "target_dir")
+	_ = os.Mkdir(realDir, 0755)
+
+	realFile := filepath.Join(tmpDir, "target_file.txt")
+	_ = os.WriteFile(realFile, []byte("content"), 0644)
+
+	symDir := filepath.Join(tmpDir, "a_symlink_dir")
+	_ = os.Symlink(realDir, symDir)
+
+	symFile := filepath.Join(tmpDir, "a_symlink_file.txt")
+	_ = os.Symlink(realFile, symFile)
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("os.ReadDir failed: %v", err)
+	}
+
+	sortDirEntries(tmpDir, entries)
+
+	var actual []string
+	for _, e := range entries {
+		actual = append(actual, e.Name())
+	}
+
+	// Directories and symlinks to directories must come first:
+	// "a_symlink_dir" and "target_dir"
+	// Files and symlinks to files come next:
+	// "a_symlink_file.txt" and "target_file.txt"
+	expected := []string{
+		"a_symlink_dir",
+		"target_dir",
+		"a_symlink_file.txt",
+		"target_file.txt",
+	}
+
+	if len(actual) != len(expected) {
+		t.Fatalf("Expected %d entries, got %d: %v", len(expected), len(actual), actual)
+	}
+
+	for i := range expected {
+		if actual[i] != expected[i] {
+			t.Errorf("Index %d: expected %q, got %q (full: %v)", i, expected[i], actual[i], actual)
+		}
+	}
+}
+
+func TestReLoadDir_FoldersFirst(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	_ = os.WriteFile(filepath.Join(tmpDir, "zebra.txt"), []byte("z"), 0644)
+	_ = os.Mkdir(filepath.Join(tmpDir, "apple_folder"), 0755)
+	_ = os.WriteFile(filepath.Join(tmpDir, "apple.txt"), []byte("a"), 0644)
+
+	entries, err := os.ReadDir(tmpDir)
+	if err != nil {
+		t.Fatalf("os.ReadDir failed: %v", err)
+	}
+
+	m := model{
+		tabs:      []TabState{{currentDir: tmpDir}},
+		activeTab: 0,
+	}
+
+	m.reLoadDir(tmpDir, entries)
+
+	expected := []string{"apple_folder", "apple.txt", "zebra.txt"}
+	actual := m.curTab().filesPath
+
+	if len(actual) != len(expected) {
+		t.Fatalf("Expected %d filesPath, got %d: %v", len(expected), len(actual), actual)
+	}
+
+	for i := range expected {
+		if actual[i] != expected[i] {
+			t.Errorf("Index %d: expected %q, got %q", i, expected[i], actual[i])
+		}
+	}
+}
+
+func TestGetPreviewLines_FoldersFirst(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	_ = os.WriteFile(filepath.Join(tmpDir, "file_1.txt"), []byte("f1"), 0644)
+	_ = os.Mkdir(filepath.Join(tmpDir, "dir_1"), 0755)
+
+	lines := getPreviewLines(tmpDir, true, false)
+	if len(lines) != 2 {
+		t.Fatalf("Expected 2 preview lines, got %d: %v", len(lines), lines)
+	}
+
+	// First line should be dir_1 with DirIcon
+	if !strings.Contains(lines[0], "dir_1") || !strings.Contains(lines[0], DirIcon) {
+		t.Errorf("Expected first line to be dir_1 with DirIcon, got %q", lines[0])
+	}
+	// Second line should be file_1.txt with FileIcon
+	if !strings.Contains(lines[1], "file_1.txt") || !strings.Contains(lines[1], FileIcon) {
+		t.Errorf("Expected second line to be file_1.txt with FileIcon, got %q", lines[1])
+	}
+}
+

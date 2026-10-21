@@ -134,6 +134,7 @@ func (m model) handleExplorerKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		entries, err := os.ReadDir(t.currentDir)
 		files := []string{}
 		if err == nil {
+			sortDirEntries(t.currentDir, entries)
 			for _, entry := range entries {
 				if !m.showHidden && strings.HasPrefix(entry.Name(), ".") {
 					continue

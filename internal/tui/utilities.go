@@ -1,12 +1,14 @@
 package tui
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"os/exec"
 	"os/user"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/atotto/clipboard"
@@ -48,27 +50,84 @@ func revealInFileExplorer(targetPath string) error {
 	return cmd.Start()
 }
 
-// copy to clipboard
+// copy to clipboard with multi-backend synchronization (Wayland, X11, OSC 52)
 func copyToClipboard(text string) error {
+	var lastErr error
+	copied := false
+
+	// 1. Wayland Clipboard & Primary selection
 	if os.Getenv("WAYLAND_DISPLAY") != "" {
 		if _, err := exec.LookPath("wl-copy"); err == nil {
-			cmd := exec.Command("wl-copy", "--type", "text/plain")
-			in, err := cmd.StdinPipe()
-			if err == nil {
-				if err := cmd.Start(); err == nil {
-					if _, err := in.Write([]byte(text)); err == nil {
-						_ = in.Close()
-						if err := cmd.Wait(); err == nil {
-							return nil
-						}
-					} else {
-						_ = in.Close()
-					}
-				}
+			if err := runClipboardCommand(text, "wl-copy", "--type", "text/plain"); err == nil {
+				copied = true
+			} else {
+				lastErr = err
 			}
+			_ = runClipboardCommand(text, "wl-copy", "--primary", "--type", "text/plain")
 		}
 	}
-	return clipboard.WriteAll(text)
+
+	// 2. X11 / Xwayland Clipboard & Primary selection
+	if os.Getenv("DISPLAY") != "" {
+		if _, err := exec.LookPath("xclip"); err == nil {
+			if err := runClipboardCommand(text, "xclip", "-selection", "clipboard", "-in"); err == nil {
+				copied = true
+			} else if lastErr == nil {
+				lastErr = err
+			}
+			_ = runClipboardCommand(text, "xclip", "-selection", "primary", "-in")
+		} else if _, err := exec.LookPath("xsel"); err == nil {
+			if err := runClipboardCommand(text, "xsel", "--clipboard", "--input"); err == nil {
+				copied = true
+			} else if lastErr == nil {
+				lastErr = err
+			}
+			_ = runClipboardCommand(text, "xsel", "--primary", "--input")
+		}
+	}
+
+	// 3. Fallback to atotto/clipboard if neither worked
+	if !copied {
+		if err := clipboard.WriteAll(text); err == nil {
+			copied = true
+		} else {
+			lastErr = err
+		}
+	}
+
+	// 4. Emit OSC 52 sequence to terminal
+	emitOSC52(text)
+
+	if !copied && lastErr != nil {
+		return lastErr
+	}
+	return nil
+}
+
+func runClipboardCommand(input string, name string, args ...string) error {
+	cmd := exec.Command(name, args...)
+	in, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	if _, err := in.Write([]byte(input)); err != nil {
+		_ = in.Close()
+		return err
+	}
+	_ = in.Close()
+	return cmd.Wait()
+}
+
+func emitOSC52(text string) {
+	b64 := base64.StdEncoding.EncodeToString([]byte(text))
+	osc := fmt.Sprintf("\x1b]52;c;%s\x07", b64)
+	if f, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0); err == nil {
+		_, _ = f.WriteString(osc)
+		_ = f.Close()
+	}
 }
 
 func generateDirectoryStructure(root string, showHidden bool) string {
@@ -88,6 +147,7 @@ func generateDirectoryStructure(root string, showHidden bool) string {
 		if err != nil {
 			return
 		}
+		sortDirEntries(currentDir, entries)
 
 		var filtered []os.DirEntry
 		for _, e := range entries {
@@ -106,7 +166,7 @@ func generateDirectoryStructure(root string, showHidden bool) string {
 				childPrefix = "    "
 			}
 
-			if e.IsDir() {
+			if isDirEntry(currentDir, e) {
 				sb.WriteString(prefix + connector + e.Name() + "/\n")
 				walk(filepath.Join(currentDir, e.Name()), prefix+childPrefix, depth+1)
 			} else {
@@ -138,6 +198,38 @@ func isDir(dir, name string) bool {
 		return false
 	}
 	return info.IsDir()
+}
+
+func isDirEntry(dir string, entry os.DirEntry) bool {
+	if entry.IsDir() {
+		return true
+	}
+	if entry.Type()&os.ModeSymlink != 0 {
+		info, err := os.Stat(filepath.Join(dir, entry.Name()))
+		return err == nil && info.IsDir()
+	}
+	return false
+}
+
+func sortDirEntries(dir string, entries []os.DirEntry) {
+	isDirMap := make(map[string]bool, len(entries))
+	for _, e := range entries {
+		isDirMap[e.Name()] = isDirEntry(dir, e)
+	}
+
+	sort.SliceStable(entries, func(i, j int) bool {
+		isDirI := isDirMap[entries[i].Name()]
+		isDirJ := isDirMap[entries[j].Name()]
+		if isDirI != isDirJ {
+			return isDirI // directory comes first
+		}
+		nameI := strings.ToLower(entries[i].Name())
+		nameJ := strings.ToLower(entries[j].Name())
+		if nameI != nameJ {
+			return nameI < nameJ
+		}
+		return entries[i].Name() < entries[j].Name()
+	})
 }
 
 func writeTempDirFile(dir string) error {
@@ -355,13 +447,14 @@ func getPreviewLines(path string, isFolder bool, showHidden bool) []string {
 		if err != nil {
 			return []string{fmt.Sprintf("Error reading directory: %v", err)}
 		}
+		sortDirEntries(path, entries)
 		var lines []string
 		for _, entry := range entries {
 			if strings.HasPrefix(entry.Name(), ".") && !showHidden {
 				continue
 			}
 			icon := FileIcon
-			if entry.IsDir() {
+			if isDirEntry(path, entry) {
 				icon = DirIcon
 			}
 			lines = append(lines, icon+" "+entry.Name())

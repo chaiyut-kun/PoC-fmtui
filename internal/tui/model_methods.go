@@ -6,6 +6,7 @@ import (
 )
 
 func (m *model) reLoadDir(changeDir string, entries []os.DirEntry) {
+	sortDirEntries(changeDir, entries)
 	t := m.curTab()
 	t.currentDir = changeDir
 	t.filesPath = t.filesPath[:0]
@@ -37,6 +38,7 @@ func (m *model) refreshAllTabs() {
 		if err != nil {
 			continue
 		}
+		sortDirEntries(t.currentDir, entries)
 
 		var oldCursorFile string
 		if t.cursor >= 0 && t.cursor < len(t.filesPath) {
