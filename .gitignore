@@ -1,13 +1,11 @@
 files/
 features
 others
-
-
+.ua/
 opencode.sh
 agy.sh
 list2
-
-
+.gemini/
 fix_newlines_plan.txt
 
 .agents
