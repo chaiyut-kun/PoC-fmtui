@@ -2159,3 +2159,22 @@ func TestGetPreviewLines_FoldersFirst(t *testing.T) {
 	}
 }
 
+func TestMetadataBarItemCounter(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"a.txt", "b.txt", "c.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m := InitialModel()
+	m.terminalWidth = 120
+	m.terminalHeight = 30
+	m.tabs = []TabState{{currentDir: dir}}
+	m.reloadCurrentDir()
+	m.tabs[0].cursor = 1
+
+	if got := m.View().Content; !strings.Contains(got, "2/3") {
+		t.Errorf("Expected item counter 2/3, got: %q", got)
+	}
+}

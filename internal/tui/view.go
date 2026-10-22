@@ -45,6 +45,7 @@ const (
 	layoutMarginOffset     = 6
 	pathPrefixRatio        = 3
 	pathTruncationOffset   = 4
+	counterSlotWidth       = 6
 )
 
 // ponytail: View is a single massive function to avoid premature abstraction.
@@ -236,25 +237,37 @@ func (m model) View() tea.View {
 	// Metadata bar pinned at bottom inside the border
 	metaFiles := t.visibleFiles()
 	maxMetaLen := max(min(sLeftWidth, 60), 15)
+	total := len(metaFiles)
+	pos := min(t.cursor+1, total)
+	// ponytail: fixed-width slot so the counter never shifts; a scrollbar would
+	// need fixed-width (truncated) file rows — add when names are truncated.
+	inner := sLeftWidth - paneBorderPadding
+	slot := min(counterSlotWidth, max(inner-4, 3))
+	raw := fmt.Sprintf("%d/%d", pos, total)
+	counter := raw + strings.Repeat(" ", max(0, slot-len(raw)))
+	budget := max(min(maxMetaLen, inner)-slot-1, 3)
 
 	if len(m.selected) > 0 {
 		summary := buildSelectionSummary(t.currentDir, metaFiles, m.selected)
-		if len([]rune(summary)) > maxMetaLen {
-			summary = string([]rune(summary)[:maxMetaLen-3]) + "..."
+		if len([]rune(summary)) > budget {
+			summary = string([]rune(summary)[:budget-3]) + "..."
 		}
-		sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), Yellow(summary)))
+		sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), Yellow(summary)))
 	} else if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
 		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
-		rawMetaText := fmt.Sprintf("%s | %s | %s | %s", meta.SizeStr, meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
-		if len([]rune(rawMetaText)) > maxMetaLen {
-			truncated := string([]rune(rawMetaText)[:maxMetaLen-3]) + "..."
-			sb.WriteString(fmt.Sprintf("%s %s\n", Gray("─"), truncated))
-		} else {
-			sb.WriteString(fmt.Sprintf("%s %s | %s | %s | %s\n",
-				Gray("─"), Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr))
+		spacious := fmt.Sprintf(" %s • %s • %s • %s", meta.SizeStr, meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
+		compact := fmt.Sprintf(" %s • %s • %s%s", meta.SizeStr, meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
+		switch {
+		case len([]rune(spacious)) <= budget:
+			sb.WriteString(fmt.Sprintf(" %s %s • %s • %s • %s\n",
+				Cyan(counter), Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr))
+		case len([]rune(compact)) <= budget:
+			sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), compact))
+		default:
+			sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), string([]rune(compact)[:budget-3])+"..."))
 		}
 	} else {
-		sb.WriteString(Gray(" No file / directory found") + "\n")
+		sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), Gray(" No file / directory found")))
 	}
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
