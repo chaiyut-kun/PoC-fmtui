@@ -46,6 +46,12 @@ const (
 	pathPrefixRatio        = 3
 	pathTruncationOffset   = 4
 	counterSlotWidth       = 6
+
+	// bottom bar (status line) frame widths — used by view.go & utilities.go
+	bottomBarLeftFrameW = 2 // "╰ "
+	bottomBarMinGap     = 1
+	bottomBarMinWidth   = 12
+	bottomBarMinDateW   = 10 // below this a cut date is noise, so hide it
 )
 
 // ponytail: View is a single massive function to avoid premature abstraction.
@@ -234,41 +240,48 @@ func (m model) View() tea.View {
 		sb.WriteString(strings.Repeat("\n", paddingLines))
 	}
 
-	// Metadata bar pinned at bottom inside the border
+	// Metadata bar rides the bottom border of the pane.
 	metaFiles := t.visibleFiles()
-	maxMetaLen := max(min(sLeftWidth, 60), 15)
 	total := len(metaFiles)
 	pos := min(t.cursor+1, total)
 	// ponytail: fixed-width slot so the counter never shifts; a scrollbar would
 	// need fixed-width (truncated) file rows — add when names are truncated.
 	inner := sLeftWidth - paneBorderPadding
-	slot := min(counterSlotWidth, max(inner-4, 3))
+	borderText := inner - 2
+	slot := min(counterSlotWidth, max(borderText-4, 3))
 	raw := fmt.Sprintf("%d/%d", pos, total)
-	counter := raw + strings.Repeat(" ", max(0, slot-len(raw)))
-	budget := max(min(maxMetaLen, inner)-slot-1, 3)
-
-	if len(m.selected) > 0 {
-		summary := buildSelectionSummary(t.currentDir, metaFiles, m.selected)
-		if len([]rune(summary)) > budget {
-			summary = string([]rune(summary)[:budget-3]) + "..."
-		}
-		sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), Yellow(summary)))
-	} else if len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles) {
-		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
-		spacious := fmt.Sprintf(" %s • %s • %s • %s", meta.SizeStr, meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
-		compact := fmt.Sprintf(" %s • %s • %s%s", meta.SizeStr, meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr)
-		switch {
-		case len([]rune(spacious)) <= budget:
-			sb.WriteString(fmt.Sprintf(" %s %s • %s • %s • %s\n",
-				Cyan(counter), Yellow(meta.SizeStr), meta.PermStrShort, meta.OwnerGroup, meta.ModTimeStr))
-		case len([]rune(compact)) <= budget:
-			sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), compact))
-		default:
-			sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), string([]rune(compact)[:budget-3])+"..."))
-		}
-	} else {
-		sb.WriteString(fmt.Sprintf(" %s %s\n", Cyan(counter), Gray(" No file / directory found")))
+	if len(raw) > slot {
+		slot = len(raw) // 10k+ items: let the number grow, metadata shifts
 	}
+	counter := raw + strings.Repeat(" ", max(0, slot-len(raw)))
+	budget := sLeftWidth - bottomBarLeftFrameW - slot - 1 - bottomBarMinGap
+	var metaText string
+	switch {
+	case len(m.selected) > 0:
+		plain := buildSelectionSummary(t.currentDir, metaFiles, m.selected)
+		metaText = Yellow(truncateMeta(plain, budget))
+	case len(metaFiles) > 0 && t.cursor >= 0 && t.cursor < len(metaFiles):
+		meta := getFileMetadataInfo(t.currentDir, metaFiles[t.cursor])
+		leftPlain := meta.SizeStr + " • " + meta.PermStrShort
+		room := budget - len([]rune(leftPlain)) - 3 // 3 = " • " before the date
+		switch {
+		case room < 0: // tiny pane: drop size, keep perms whole if at all possible
+			metaText = truncateMeta(meta.PermStrShort, budget)
+		case room < len([]rune(meta.ModTimeStr)):
+			if room >= bottomBarMinDateW {
+				metaText = Yellow(meta.SizeStr) + " • " + meta.PermStrShort +
+					" • " + truncateMeta(meta.ModTimeStr, room)
+			} else {
+				metaText = Yellow(meta.SizeStr) + " • " + meta.PermStrShort
+			}
+		default:
+			metaText = Yellow(meta.SizeStr) + " • " + meta.PermStrShort +
+				" • " + meta.ModTimeStr
+		}
+	default:
+		metaText = Gray(truncateMeta("No file / directory found", budget))
+	}
+	bottomBody := Cyan(counter) + metaText
 
 	// Trim trailing newline so lipgloss box height is calculated precisely
 	renderedText := strings.TrimSuffix(sb.String(), "\n")
@@ -430,6 +443,8 @@ func (m model) View() tea.View {
 			title = []rune(pathTrimmed)
 		}
 		leftLines[0] = createTopBorder(string(title), leftWidth, leftBorderColor, "2")
+		// Metadata bar rides the bottom border of the explorer pane.
+		leftLines[len(leftLines)-1] = createBottomBorder(bottomBody, leftWidth, leftBorderColor)
 		leftBox = strings.Join(leftLines, "\n")
 	}
 

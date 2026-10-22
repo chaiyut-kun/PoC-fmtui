@@ -3,8 +3,10 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/atotto/clipboard"
@@ -2176,5 +2178,164 @@ func TestMetadataBarItemCounter(t *testing.T) {
 
 	if got := m.View().Content; !strings.Contains(got, "2/3") {
 		t.Errorf("Expected item counter 2/3, got: %q", got)
+	}
+}
+
+// The counter must ride the bottom border of the explorer pane, not sit on an
+// interior row.
+func TestMetadataBarItemCounterOnBottomBorder(t *testing.T) {
+	dir := t.TempDir()
+	for _, n := range []string{"a.txt", "b.txt", "c.txt"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte("x"), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m := InitialModel()
+	m.terminalWidth = 120
+	m.terminalHeight = 30
+	m.tabs = []TabState{{currentDir: dir}}
+	m.reloadCurrentDir()
+	m.tabs[0].cursor = 1
+
+	found := false
+	for _, line := range strings.Split(m.View().Content, "\n") {
+		if !strings.Contains(line, "2/3") {
+			continue
+		}
+		found = true
+		if !strings.Contains(line, "╰") || !strings.Contains(line, "╯") {
+			t.Errorf("Expected counter on the bottom border, got: %q", line)
+		}
+	}
+	if !found {
+		t.Error("Expected item counter 2/3 in view")
+	}
+}
+
+// strips ANSI escape sequences so layout assertions on the bottom bar are
+// reliable.
+var ansiStripRe = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+func TestBottomBarLayout(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now().Truncate(time.Second)
+	for _, n := range []string{"a.txt", "b.txt", "c.txt"} {
+		p := filepath.Join(dir, n)
+		if err := os.WriteFile(p, []byte("hello"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		os.Chtimes(p, now, now)
+	}
+
+	m := InitialModel()
+	m.terminalWidth = 120
+	m.terminalHeight = 30
+	m.tabs = []TabState{{currentDir: dir}}
+	m.reloadCurrentDir()
+	m.tabs[0].cursor = 1 // b.txt
+
+	content := m.View().Content
+	var bottomLine string
+	for _, line := range strings.Split(content, "\n") {
+		if strings.Contains(line, "2/3") {
+			bottomLine = line
+			break
+		}
+	}
+	if bottomLine == "" {
+		t.Fatal("Could not find bottom-bar line with counter 2/3")
+	}
+
+	stripped := ansiStripRe.ReplaceAllString(bottomLine, "")
+
+	if !strings.Contains(stripped, "╰") || !strings.Contains(stripped, "╯") {
+		t.Errorf("Bottom bar missing ╰/╯: %q", stripped)
+	}
+	if strings.Contains(stripped, "─") {
+		t.Errorf("Bottom bar should not contain ─ dash: %q", stripped)
+	}
+
+	owner := getOwnerGroupStr()
+	if owner != "" && strings.Contains(stripped, owner) {
+		t.Errorf("Bottom bar must not include owner %q: %q", owner, stripped)
+	}
+
+	expectedDate := now.Format("2006-01-02 3:04 PM")
+	if !strings.Contains(stripped, expectedDate) {
+		t.Errorf("Bottom bar missing date %q: %q", expectedDate, stripped)
+	}
+
+	p1 := strings.Index(stripped, "•")
+	p2 := strings.LastIndex(stripped, "•")
+	if p2 <= p1 {
+		t.Errorf("Expected two • tokens (perms / date); got one: %q", stripped)
+	}
+
+	// date should be to the right of perms
+	dateIdx := strings.Index(stripped, expectedDate)
+	permsIdx := strings.Index(stripped, "-rw-r--r--")
+	if permsIdx < 0 {
+		t.Errorf("Expected perms -rw-r--r-- in bottom bar: %q", stripped)
+	}
+	if dateIdx < permsIdx {
+		t.Errorf("Date should be right of perms: date=%d perms=%d line=%q", dateIdx, permsIdx, stripped)
+	}
+	if !strings.Contains(stripped, "-rw-r--r-- • "+expectedDate) {
+		t.Errorf("Date must follow perms in one flow (no left/right split): %q", stripped)
+	}
+}
+
+// On a narrow pane the modified time is what gets cut, never permissions;
+// on a tiny pane the size is dropped before permissions are truncated.
+func TestBottomBarTruncatesDateNotPerms(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Now().Truncate(time.Second)
+	for _, n := range []string{"a.txt", "b.txt", "c.txt"} {
+		p := filepath.Join(dir, n)
+		if err := os.WriteFile(p, []byte("hello"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		os.Chtimes(p, now, now)
+	}
+
+	bottomLine := func(width int) string {
+		m := InitialModel()
+		m.terminalWidth = width
+		m.terminalHeight = 30
+		m.tabs = []TabState{{currentDir: dir}}
+		m.reloadCurrentDir()
+		m.tabs[0].cursor = 1
+		for _, line := range strings.Split(m.View().Content, "\n") {
+			if strings.Contains(line, "2/3") {
+				return ansiStripRe.ReplaceAllString(line, "")
+			}
+		}
+		return ""
+	}
+
+	narrow := bottomLine(90)
+	if narrow == "" {
+		t.Fatal("Could not find bottom-bar line with counter 2/3 (width 90)")
+	}
+	if !strings.Contains(narrow, "-rw-r--r--") {
+		t.Errorf("permissions must survive truncation: %q", narrow)
+	}
+	if strings.Contains(narrow, now.Format("2006-01-02 3:04 PM")) {
+		t.Errorf("full date should be truncated on a narrow pane: %q", narrow)
+	}
+	if !strings.Contains(narrow, "...") {
+		t.Errorf("truncated date should be marked with ...: %q", narrow)
+	}
+
+	tiny := bottomLine(50)
+	if tiny == "" {
+		t.Fatal("Could not find bottom-bar line with counter 2/3 (width 50)")
+	}
+	if !strings.Contains(tiny, "-rw-r--r--") {
+		t.Errorf("permissions must survive on a tiny pane: %q", tiny)
+	}
+	if strings.Contains(tiny, "5 B") {
+		t.Errorf("size should be dropped before permissions are cut: %q", tiny)
 	}
 }

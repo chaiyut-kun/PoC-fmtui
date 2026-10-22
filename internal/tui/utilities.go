@@ -11,8 +11,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/atotto/clipboard"
 	"charm.land/lipgloss/v2"
+	"github.com/atotto/clipboard"
 )
 
 var tempDirFile = filepath.Join(os.TempDir(), "fmtui-dir")
@@ -676,16 +676,44 @@ func createTopBorder(title string, width int, color string, paneNum string) stri
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(color)).Render(topStr)
 }
 
-// ponytail: Helper to truncate paths from the left (showing the most specific subfolders) if they exceed maximum width
-func truncatePathLeft(path string, maxWidth int) string {
-	if len(path) <= maxWidth {
-		return path
+// truncateMeta shortens plain text to fit width, using "..." when it must cut.
+// ponytail: plain text only — call it before adding color.
+func truncateMeta(text string, width int) string {
+	if width <= 0 {
+		return ""
 	}
-	if maxWidth <= 3 {
-		return "..."
+	runes := []rune(text)
+	if len(runes) <= width {
+		return text
 	}
-	return "..." + path[len(path)-(maxWidth-3):]
+	if width <= 3 {
+		return string(runes[:width])
+	}
+	return string(runes[:width-3]) + "..."
 }
+
+// createBottomBorder renders the explorer status bar on the pane's bottom edge:
+// ╰ 1/22  1 items • rwxr-xr-x • 2026-07-19 5:56 PM              ╯
+// ponytail: one flowing line — leftover space is plain padding before ╯.
+func createBottomBorder(content string, width int, color string) string {
+	if width < bottomBarMinWidth {
+		return ""
+	}
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(color))
+	pad := max(width-bottomBarLeftFrameW-lipgloss.Width(content)-1, bottomBarMinGap)
+	return style.Render("╰ ") + content + strings.Repeat(" ", pad) + style.Render("╯")
+}
+
+// ponytail: Helper to truncate paths from the left (showing the most specific subfolders) if they exceed maximum width
+// func truncatePathLeft(path string, maxWidth int) string {
+// 	if len(path) <= maxWidth {
+// 		return path
+// 	}
+// 	if maxWidth <= 3 {
+// 		return "..."
+// 	}
+// 	return "..." + path[len(path)-(maxWidth-3):]
+// }
 
 // truncateFileName truncates a display name to fit within maxWidth.
 // For files with extensions, preserves the extension and inserts "..."

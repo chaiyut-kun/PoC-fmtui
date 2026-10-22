@@ -338,8 +338,8 @@ func (m *model) getMaxVisibleFiles() int {
 	// rows consumed inside the box beyond the file list:
 	//   1 = path header line
 	//   3 = search bar lines (with border)
-	//   1 = metadata bar at bottom
-	consumed := 5
+	// The metadata bar rides the bottom border, so it takes no interior row.
+	consumed := 4
 	maxVisible := max(leftHeight-consumed, 1)
 	return maxVisible
 }
