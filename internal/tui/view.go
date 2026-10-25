@@ -369,11 +369,11 @@ func (m model) View() tea.View {
 		visibleBm := m.bookmarks
 		if bmScroll < len(m.bookmarks) {
 			visibleBm = m.bookmarks[bmScroll:]
+			if len(visibleBm) > availBmLines {
+				visibleBm = visibleBm[:availBmLines]
+			}
 		} else {
 			visibleBm = nil
-		}
-		if len(visibleBm) > availBmLines {
-			visibleBm = visibleBm[:availBmLines]
 		}
 
 		if len(m.bookmarks) == 0 {

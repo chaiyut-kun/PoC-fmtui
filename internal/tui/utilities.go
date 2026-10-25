@@ -704,17 +704,6 @@ func createBottomBorder(content string, width int, color string) string {
 	return style.Render("╰ ") + content + strings.Repeat(" ", pad) + style.Render("╯")
 }
 
-// ponytail: Helper to truncate paths from the left (showing the most specific subfolders) if they exceed maximum width
-// func truncatePathLeft(path string, maxWidth int) string {
-// 	if len(path) <= maxWidth {
-// 		return path
-// 	}
-// 	if maxWidth <= 3 {
-// 		return "..."
-// 	}
-// 	return "..." + path[len(path)-(maxWidth-3):]
-// }
-
 // truncateFileName truncates a display name to fit within maxWidth.
 // For files with extensions, preserves the extension and inserts "..."
 // in the middle of the base name. For directories and dotfiles, truncates

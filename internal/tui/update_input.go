@@ -189,12 +189,10 @@ func (m model) handleInputKeys(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
-			filePath := filepath.Join(t.currentDir, val)
-
 			// Auto-detect: trailing "/" = directory, everything else = file
 			isDir := strings.HasSuffix(val, "/")
 			cleanVal := strings.TrimSuffix(val, "/")
-			filePath = filepath.Join(t.currentDir, cleanVal)
+			filePath := filepath.Join(t.currentDir, cleanVal)
 
 			if isDir {
 				err := os.Mkdir(filePath, 0755)
